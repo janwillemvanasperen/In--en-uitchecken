@@ -52,10 +52,11 @@ export async function middleware(request: NextRequest) {
       .from('users')
       .select('role')
       .eq('id', user.id)
-      .single<{ role: 'student' | 'admin' }>()
+      .single()
 
     const url = request.nextUrl.clone()
-    if (userData?.role === 'admin') {
+    const userRole = (userData as { role: 'student' | 'admin' } | null)?.role
+    if (userRole === 'admin') {
       url.pathname = '/admin/dashboard'
     } else {
       url.pathname = '/student/dashboard'
@@ -69,9 +70,10 @@ export async function middleware(request: NextRequest) {
       .from('users')
       .select('role')
       .eq('id', user.id)
-      .single<{ role: 'student' | 'admin' }>()
+      .single()
 
-    if (userData?.role !== 'admin') {
+    const userRole = (userData as { role: 'student' | 'admin' } | null)?.role
+    if (userRole !== 'admin') {
       const url = request.nextUrl.clone()
       url.pathname = '/student/dashboard'
       return NextResponse.redirect(url)
@@ -83,9 +85,10 @@ export async function middleware(request: NextRequest) {
       .from('users')
       .select('role')
       .eq('id', user.id)
-      .single<{ role: 'student' | 'admin' }>()
+      .single()
 
-    if (userData?.role === 'admin') {
+    const userRole = (userData as { role: 'student' | 'admin' } | null)?.role
+    if (userRole === 'admin') {
       const url = request.nextUrl.clone()
       url.pathname = '/admin/dashboard'
       return NextResponse.redirect(url)

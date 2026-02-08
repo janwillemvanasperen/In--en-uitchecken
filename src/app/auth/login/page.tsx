@@ -35,13 +35,14 @@ export default function LoginPage() {
         .from('users')
         .select('role')
         .eq('id', data.user.id)
-        .single<{ role: 'student' | 'admin' }>()
+        .single()
 
       if (userError) throw userError
       if (!userData) throw new Error('User data not found')
 
       // Redirect based on role
-      if (userData.role === 'admin') {
+      const userRole = (userData as { role: 'student' | 'admin' }).role
+      if (userRole === 'admin') {
         router.push('/admin/dashboard')
       } else {
         router.push('/student/dashboard')
