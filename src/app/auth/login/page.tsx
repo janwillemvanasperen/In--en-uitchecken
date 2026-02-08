@@ -38,6 +38,7 @@ export default function LoginPage() {
         .single()
 
       if (userError) throw userError
+      if (!userData) throw new Error('User data not found')
 
       // Redirect based on role
       if (userData.role === 'admin') {
