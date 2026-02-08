@@ -1,7 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import type { Database } from '@/lib/supabase/database.types'
 
-export async function getCurrentUser() {
+type UserProfile = Database['public']['Tables']['users']['Row']
+
+export async function getCurrentUser(): Promise<UserProfile | null> {
   const supabase = await createClient()
   const {
     data: { user },
@@ -20,7 +23,7 @@ export async function getCurrentUser() {
   return userData
 }
 
-export async function requireAuth() {
+export async function requireAuth(): Promise<UserProfile> {
   const user = await getCurrentUser()
   if (!user) {
     redirect('/auth/login')
@@ -28,7 +31,7 @@ export async function requireAuth() {
   return user
 }
 
-export async function requireAdmin() {
+export async function requireAdmin(): Promise<UserProfile> {
   const user = await requireAuth()
   if (user.role !== 'admin') {
     redirect('/student/dashboard')
@@ -36,7 +39,7 @@ export async function requireAdmin() {
   return user
 }
 
-export async function requireStudent() {
+export async function requireStudent(): Promise<UserProfile> {
   const user = await requireAuth()
   if (user.role !== 'student') {
     redirect('/admin/dashboard')
