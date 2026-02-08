@@ -4,17 +4,59 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { LogoutButton } from '@/components/logout-button'
+import { TodayScheduleCard } from '@/components/student/today-schedule-card'
+import { CurrentStatusCard } from '@/components/student/current-status-card'
+import { WeeklyProgressCard } from '@/components/student/weekly-progress-card'
+import { NextSessionCard } from '@/components/student/next-session-card'
+import { getMonday } from '@/lib/date-utils'
 
 export default async function StudentDashboard() {
   const user = await requireStudent()
   const supabase = await createClient()
 
-  // Get user's schedules
-  const { data: schedules } = await supabase
+  // Get today's day of week (1 = Monday, 7 = Sunday)
+  const today = new Date()
+  const dayOfWeek = today.getDay() || 7
+
+  // Get today's schedule
+  const { data: todaySchedule } = await supabase
     .from('schedules')
     .select('*')
     .eq('user_id', user.id)
+    .eq('day_of_week', dayOfWeek)
+    .eq('status', 'approved')
+    .lte('valid_from', today.toISOString().split('T')[0])
+    .gte('valid_until', today.toISOString().split('T')[0])
+    .single()
+
+  // Get active check-in
+  const { data: activeCheckIn } = await supabase
+    .from('check_ins')
+    .select('*, locations(*)')
+    .eq('user_id', user.id)
+    .is('check_out_time', null)
+    .single()
+
+  // Get weekly hours (current week starting Monday)
+  const monday = getMonday(today)
+  const { data: weeklyHours } = await supabase
+    .rpc('get_weekly_hours', {
+      student_id: user.id,
+      week_start: monday.toISOString().split('T')[0],
+    })
+
+  // Get next scheduled session (after today)
+  const { data: nextSession } = await supabase
+    .from('schedules')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('status', 'approved')
+    .gt('day_of_week', dayOfWeek)
+    .lte('valid_from', today.toISOString().split('T')[0])
+    .gte('valid_until', today.toISOString().split('T')[0])
     .order('day_of_week', { ascending: true })
+    .limit(1)
+    .single()
 
   // Get recent check-ins
   const { data: checkIns } = await supabase
@@ -37,36 +79,24 @@ export default async function StudentDashboard() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <Card>
-            <CardHeader>
-              <CardTitle>Welkom terug!</CardTitle>
-              <CardDescription>
-                {user.full_name}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Je bent ingelogd als student
-              </p>
-            </CardContent>
-          </Card>
+        {/* Top row: Status, Schedule, Progress */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-6">
+          <CurrentStatusCard
+            initialCheckIn={activeCheckIn}
+            userId={user.id}
+          />
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Mijn rooster</CardTitle>
-              <CardDescription>
-                {schedules?.length || 0} sessies gepland
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link href="/student/schedule">
-                <Button variant="outline" className="w-full">
-                  Bekijk rooster
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
+          <TodayScheduleCard schedule={todaySchedule} />
+
+          <WeeklyProgressCard weeklyHours={weeklyHours || 0} />
+        </div>
+
+        {/* Second row: Next session and quick actions */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-6">
+          <NextSessionCard
+            nextSession={nextSession}
+            isCheckedIn={!!activeCheckIn}
+          />
 
           <Card>
             <CardHeader>
@@ -79,6 +109,22 @@ export default async function StudentDashboard() {
               <Link href="/student/check-in">
                 <Button className="w-full">
                   Check in/uit
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Geschiedenis</CardTitle>
+              <CardDescription>
+                Bekijk al je check-ins
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/student/history">
+                <Button variant="outline" className="w-full">
+                  Bekijk geschiedenis
                 </Button>
               </Link>
             </CardContent>
