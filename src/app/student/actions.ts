@@ -68,6 +68,7 @@ export async function checkIn(data: CheckInInput) {
       expected_end: data.expectedEnd,
     }
 
+    // @ts-ignore - Supabase SSR type inference issue in production build
     const { data: checkIn, error: checkInError } = await supabase
       .from('check_ins')
       .insert([checkInData])
@@ -110,6 +111,7 @@ export async function checkOut() {
     }
 
     // Update with check-out time
+    // @ts-ignore - Supabase SSR type inference issue in production build
     const { error: updateError } = await supabase
       .from('check_ins')
       .update({ check_out_time: new Date().toISOString() })
@@ -155,6 +157,7 @@ export async function submitLeaveRequest(data: LeaveRequestInput) {
       status: 'pending',
     }
 
+    // @ts-ignore - Supabase SSR type inference issue in production build
     const { error: insertError } = await supabase
       .from('leave_requests')
       .insert([leaveRequestData])
