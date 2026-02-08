@@ -35,7 +35,7 @@ export default function LoginPage() {
         .from('users')
         .select('role')
         .eq('id', data.user.id)
-        .single()
+        .single<{ role: 'student' | 'admin' }>()
 
       if (userError) throw userError
       if (!userData) throw new Error('User data not found')

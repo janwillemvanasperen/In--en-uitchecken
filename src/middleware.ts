@@ -52,7 +52,7 @@ export async function middleware(request: NextRequest) {
       .from('users')
       .select('role')
       .eq('id', user.id)
-      .single()
+      .single<{ role: 'student' | 'admin' }>()
 
     const url = request.nextUrl.clone()
     if (userData?.role === 'admin') {
@@ -69,7 +69,7 @@ export async function middleware(request: NextRequest) {
       .from('users')
       .select('role')
       .eq('id', user.id)
-      .single()
+      .single<{ role: 'student' | 'admin' }>()
 
     if (userData?.role !== 'admin') {
       const url = request.nextUrl.clone()
@@ -83,7 +83,7 @@ export async function middleware(request: NextRequest) {
       .from('users')
       .select('role')
       .eq('id', user.id)
-      .single()
+      .single<{ role: 'student' | 'admin' }>()
 
     if (userData?.role === 'admin') {
       const url = request.nextUrl.clone()
