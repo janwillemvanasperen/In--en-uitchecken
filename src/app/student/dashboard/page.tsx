@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { requireStudent } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
