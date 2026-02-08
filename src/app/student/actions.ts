@@ -5,6 +5,7 @@ import { requireStudent } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { isWithinRadius } from '@/lib/geolocation'
 import type { CheckInInput, LeaveRequestInput, Location } from '@/types'
+import type { Database } from '@/lib/supabase/database.types'
 
 export async function checkIn(data: CheckInInput) {
   try {
@@ -59,15 +60,17 @@ export async function checkIn(data: CheckInInput) {
     }
 
     // Create check-in
+    const checkInData: Database['public']['Tables']['check_ins']['Insert'] = {
+      user_id: user.id,
+      location_id: data.locationId,
+      check_in_time: new Date().toISOString(),
+      expected_start: data.expectedStart,
+      expected_end: data.expectedEnd,
+    }
+
     const { data: checkIn, error: checkInError } = await supabase
       .from('check_ins')
-      .insert([{
-        user_id: user.id,
-        location_id: data.locationId,
-        check_in_time: new Date().toISOString(),
-        expected_start: data.expectedStart,
-        expected_end: data.expectedEnd,
-      }])
+      .insert([checkInData])
       .select()
       .single()
 
@@ -144,15 +147,17 @@ export async function submitLeaveRequest(data: LeaveRequestInput) {
     }
 
     // Insert leave request
+    const leaveRequestData: Database['public']['Tables']['leave_requests']['Insert'] = {
+      user_id: user.id,
+      date: data.date,
+      reason: data.reason,
+      description: data.description,
+      status: 'pending',
+    }
+
     const { error: insertError } = await supabase
       .from('leave_requests')
-      .insert([{
-        user_id: user.id,
-        date: data.date,
-        reason: data.reason,
-        description: data.description,
-        status: 'pending',
-      }])
+      .insert([leaveRequestData])
 
     if (insertError) {
       console.error('Leave request error:', insertError)
