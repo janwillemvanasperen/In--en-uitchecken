@@ -61,13 +61,13 @@ export async function checkIn(data: CheckInInput) {
     // Create check-in
     const { data: checkIn, error: checkInError } = await supabase
       .from('check_ins')
-      .insert({
+      .insert([{
         user_id: user.id,
         location_id: data.locationId,
         check_in_time: new Date().toISOString(),
         expected_start: data.expectedStart,
         expected_end: data.expectedEnd,
-      })
+      }])
       .select()
       .single()
 
@@ -146,13 +146,13 @@ export async function submitLeaveRequest(data: LeaveRequestInput) {
     // Insert leave request
     const { error: insertError } = await supabase
       .from('leave_requests')
-      .insert({
+      .insert([{
         user_id: user.id,
         date: data.date,
         reason: data.reason,
         description: data.description,
         status: 'pending',
-      })
+      }])
 
     if (insertError) {
       console.error('Leave request error:', insertError)
