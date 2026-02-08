@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requireStudent } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { isWithinRadius } from '@/lib/geolocation'
-import type { CheckInInput, LeaveRequestInput } from '@/types'
+import type { CheckInInput, LeaveRequestInput, Location } from '@/types'
 
 export async function checkIn(data: CheckInInput) {
   try {
@@ -12,15 +12,17 @@ export async function checkIn(data: CheckInInput) {
     const supabase = await createClient()
 
     // Verify location exists
-    const { data: location, error: locationError } = await supabase
+    const { data: locationData, error: locationError } = await supabase
       .from('locations')
       .select('*')
       .eq('id', data.locationId)
       .single()
 
-    if (locationError || !location) {
+    if (locationError || !locationData) {
       return { error: 'Locatie niet gevonden' }
     }
+
+    const location = locationData as Location
 
     // Validate QR code if provided
     if (data.qrCode) {
