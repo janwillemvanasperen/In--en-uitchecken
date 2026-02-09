@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR Codes - Locaties</title>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 20px;
+      text-align: center;
+    }
+    .qr-card {
+      border: 2px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 30px;
+      margin: 20px 0;
+    }
+    .qr-card h2 {
+      margin: 0 0 5px;
+      font-size: 1.5rem;
+    }
+    .qr-card p {
+      color: #6b7280;
+      margin: 0 0 20px;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+    }
+    .code {
+      margin-top: 15px;
+      font-family: monospace;
+      font-size: 0.9rem;
+      color: #9ca3af;
+    }
+    button {
+      margin-top: 20px;
+      padding: 10px 24px;
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    button:hover { background: #1d4ed8; }
+    @media print {
+      button { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <h1>QR Codes - Check-in Locaties</h1>
+
+  <div class="qr-card">
+    <h2>Thuis</h2>
+    <p>Akkerwinde 5, Culemborg</p>
+    <canvas id="qr-thuis"></canvas>
+    <div class="code">LOC-THUIS-001</div>
+  </div>
+
+  <button onclick="window.print()">Printen</button>
+
+  <script>
+    QRCode.toCanvas(document.getElementById('qr-thuis'), 'LOC-THUIS-001', {
+      width: 250,
+      margin: 2,
+    });
+  </script>
+</body>
+</html>
