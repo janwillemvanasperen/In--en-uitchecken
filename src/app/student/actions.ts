@@ -155,7 +155,7 @@ export async function submitLeaveRequest(data: LeaveRequestInput) {
       user_id: user.id,
       date: data.date,
       reason: data.reason,
-      description: data.description,
+      description: data.description || null,
       status: 'pending',
     }
 
@@ -166,7 +166,7 @@ export async function submitLeaveRequest(data: LeaveRequestInput) {
 
     if (insertError) {
       console.error('Leave request error:', insertError)
-      return { error: 'Verlofaanvraag mislukt. Probeer het opnieuw.' }
+      return { error: `Verlofaanvraag mislukt: ${insertError.message}` }
     }
 
     // Revalidate leave requests page
