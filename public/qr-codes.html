@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>QR Codes - Locaties</title>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <style>
     body {
       font-family: system-ui, -apple-system, sans-serif;
@@ -27,7 +26,7 @@
       color: #6b7280;
       margin: 0 0 20px;
     }
-    canvas {
+    .qr-card img {
       display: block;
       margin: 0 auto;
     }
@@ -59,17 +58,15 @@
   <div class="qr-card">
     <h2>Thuis</h2>
     <p>Akkerwinde 5, Culemborg</p>
-    <canvas id="qr-thuis"></canvas>
+    <img
+      src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=LOC-THUIS-001"
+      alt="QR Code LOC-THUIS-001"
+      width="250"
+      height="250"
+    />
     <div class="code">LOC-THUIS-001</div>
   </div>
 
   <button onclick="window.print()">Printen</button>
-
-  <script>
-    QRCode.toCanvas(document.getElementById('qr-thuis'), 'LOC-THUIS-001', {
-      width: 250,
-      margin: 2,
-    });
-  </script>
 </body>
 </html>
