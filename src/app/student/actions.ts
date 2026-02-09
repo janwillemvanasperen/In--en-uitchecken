@@ -60,13 +60,14 @@ export async function checkIn(data: CheckInInput) {
       return { error: 'Je bent al ingecheckt. Check eerst uit voordat je opnieuw incheckt.' }
     }
 
-    // Create check-in
+    // Create check-in - convert time strings to full timestamps for today
+    const today = new Date().toISOString().split('T')[0]
     const checkInData: Database['public']['Tables']['check_ins']['Insert'] = {
       user_id: user.id,
       location_id: data.locationId,
       check_in_time: new Date().toISOString(),
-      expected_start: data.expectedStart,
-      expected_end: data.expectedEnd,
+      expected_start: `${today}T${data.expectedStart}`,
+      expected_end: `${today}T${data.expectedEnd}`,
     }
 
     // @ts-ignore - Supabase SSR type inference issue in production build
