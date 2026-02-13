@@ -9,6 +9,7 @@ import { TodayScheduleCard } from '@/components/student/today-schedule-card'
 import { CurrentStatusCard } from '@/components/student/current-status-card'
 import { WeeklyProgressCard } from '@/components/student/weekly-progress-card'
 import { NextSessionCard } from '@/components/student/next-session-card'
+import { PushNotificationToggle } from '@/components/student/push-notification-toggle'
 import { getMonday } from '@/lib/date-utils'
 
 export default async function StudentDashboard() {
@@ -166,7 +167,21 @@ export default async function StudentDashboard() {
           </CardContent>
         </Card>
 
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
+        <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <Card>
+            <CardHeader>
+              <CardTitle>Rooster beheren</CardTitle>
+              <CardDescription>Bekijk en bewerk je weekrooster</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/student/schedule">
+                <Button variant="outline" className="w-full">
+                  Beheer rooster
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Verlofaanvragen</CardTitle>
@@ -181,19 +196,7 @@ export default async function StudentDashboard() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Voortgang</CardTitle>
-              <CardDescription>Bekijk je uren en voortgang</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link href="/student/progress">
-                <Button variant="outline" className="w-full">
-                  Bekijk voortgang
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
+          <PushNotificationToggle />
         </div>
       </main>
     </div>

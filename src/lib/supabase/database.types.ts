@@ -74,6 +74,7 @@ export type Database = {
           status: 'pending' | 'approved' | 'rejected'
           valid_from: string
           valid_until: string
+          submission_group: string | null
           created_at: string
           updated_at: string
         }
@@ -86,6 +87,7 @@ export type Database = {
           status?: 'pending' | 'approved' | 'rejected'
           valid_from: string
           valid_until: string
+          submission_group?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -98,6 +100,7 @@ export type Database = {
           status?: 'pending' | 'approved' | 'rejected'
           valid_from?: string
           valid_until?: string
+          submission_group?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -176,6 +179,64 @@ export type Database = {
           reviewed_at?: string | null
           created_at?: string
           updated_at?: string
+        }
+      }
+      push_subscriptions: {
+        Row: {
+          id: string
+          user_id: string
+          endpoint: string
+          p256dh: string
+          auth: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          endpoint: string
+          p256dh: string
+          auth: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          endpoint?: string
+          p256dh?: string
+          auth?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      notification_log: {
+        Row: {
+          id: string
+          user_id: string
+          notification_type: string
+          reference_id: string | null
+          reference_date: string | null
+          sent_at: string
+          delivered: boolean
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          notification_type: string
+          reference_id?: string | null
+          reference_date?: string | null
+          sent_at?: string
+          delivered?: boolean
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          notification_type?: string
+          reference_id?: string | null
+          reference_date?: string | null
+          sent_at?: string
+          delivered?: boolean
         }
       }
       settings: {

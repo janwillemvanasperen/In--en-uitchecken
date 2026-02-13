@@ -1,0 +1,22 @@
+-- Enable required extensions for scheduled notifications
+-- Note: pg_cron and pg_net must be enabled via Supabase Dashboard > Database > Extensions
+--
+-- After enabling extensions, create the cron job via SQL Editor:
+--
+-- SELECT cron.schedule(
+--   'send-push-notifications',
+--   '*/5 * * * *',
+--   $$
+--   SELECT net.http_post(
+--     url := current_setting('app.settings.supabase_url') || '/functions/v1/send-notifications',
+--     headers := jsonb_build_object(
+--       'Authorization', 'Bearer ' || current_setting('app.settings.service_role_key'),
+--       'Content-Type', 'application/json'
+--     ),
+--     body := '{}'::jsonb
+--   );
+--   $$
+-- );
+--
+-- IMPORTANT: Configure the cron job via the Supabase Dashboard for security.
+-- Go to Database > Cron Jobs and set up a job that calls the Edge Function every 5 minutes.

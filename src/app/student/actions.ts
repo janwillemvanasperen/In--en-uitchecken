@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requireStudent } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { isWithinRadius } from '@/lib/geolocation'
-import type { CheckInInput, LeaveRequestInput, Location } from '@/types'
+import type { CheckInInput, LeaveRequestInput, Location, ScheduleSubmissionInput, PushSubscriptionInput } from '@/types'
 import type { Database } from '@/lib/supabase/database.types'
 
 export async function checkIn(data: CheckInInput) {
@@ -175,6 +175,292 @@ export async function submitLeaveRequest(data: LeaveRequestInput) {
     return { success: true }
   } catch (error) {
     console.error('Leave request error:', error)
+    return { error: 'Er is een onverwachte fout opgetreden' }
+  }
+}
+
+export async function submitSchedule(data: ScheduleSubmissionInput) {
+  try {
+    const user = await requireStudent()
+    const supabase = await createClient()
+
+    const activeEntries = data.entries.filter(e => e.active)
+
+    // Validate at least one active day
+    if (activeEntries.length === 0) {
+      return { error: 'Selecteer minimaal één dag' }
+    }
+
+    // Validate each entry: start < end
+    for (const entry of activeEntries) {
+      if (entry.start_time >= entry.end_time) {
+        const dayNames: Record<number, string> = {
+          1: 'Maandag', 2: 'Dinsdag', 3: 'Woensdag', 4: 'Donderdag',
+          5: 'Vrijdag', 6: 'Zaterdag', 7: 'Zondag'
+        }
+        return { error: `${dayNames[entry.day_of_week]}: eindtijd moet na starttijd liggen` }
+      }
+    }
+
+    // Calculate total hours
+    const totalHours = activeEntries.reduce((sum, entry) => {
+      const [sh, sm] = entry.start_time.split(':').map(Number)
+      const [eh, em] = entry.end_time.split(':').map(Number)
+      return sum + (eh + em / 60) - (sh + sm / 60)
+    }, 0)
+
+    // Fetch minimum hours setting
+    const { data: minHoursSetting } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'minimum_hours_per_week')
+      .single()
+
+    const minimumHours = minHoursSetting ? Number(minHoursSetting.value) : 16
+
+    if (totalHours < minimumHours) {
+      return { error: `Minimaal ${minimumHours} uur per week vereist. Je hebt nu ${totalHours.toFixed(1)} uur.` }
+    }
+
+    // Check no existing pending schedule
+    const { data: existingPending } = await supabase
+      .from('schedules')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('status', 'pending')
+      .limit(1)
+
+    if (existingPending && existingPending.length > 0) {
+      return { error: 'Je hebt al een rooster in afwachting. Bewerk of verwijder dat eerst.' }
+    }
+
+    // Fetch period weeks setting
+    const { data: periodSetting } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'schedule_approval_period_weeks')
+      .single()
+
+    const periodWeeks = periodSetting ? Number(periodSetting.value) : 6
+
+    // Calculate validity period
+    const today = new Date()
+    const validFrom = today.toISOString().split('T')[0]
+    const validUntilDate = new Date(today)
+    validUntilDate.setDate(validUntilDate.getDate() + periodWeeks * 7)
+    const validUntil = validUntilDate.toISOString().split('T')[0]
+
+    // Generate submission group
+    const submissionGroup = crypto.randomUUID()
+
+    // Insert schedule entries
+    const scheduleRows = activeEntries.map(entry => ({
+      user_id: user.id,
+      day_of_week: entry.day_of_week,
+      start_time: entry.start_time,
+      end_time: entry.end_time,
+      status: 'pending' as const,
+      valid_from: validFrom,
+      valid_until: validUntil,
+      submission_group: submissionGroup,
+    }))
+
+    // @ts-ignore - Supabase SSR type inference issue
+    const { error: insertError } = await supabase
+      .from('schedules')
+      .insert(scheduleRows)
+
+    if (insertError) {
+      console.error('Schedule submit error:', insertError)
+      return { error: 'Rooster indienen mislukt. Probeer het opnieuw.' }
+    }
+
+    revalidatePath('/student/schedule')
+    revalidatePath('/student/dashboard')
+
+    return { success: true }
+  } catch (error) {
+    console.error('Schedule submit error:', error)
+    return { error: 'Er is een onverwachte fout opgetreden' }
+  }
+}
+
+export async function updatePendingSchedule(data: ScheduleSubmissionInput) {
+  try {
+    const user = await requireStudent()
+    const supabase = await createClient()
+
+    const activeEntries = data.entries.filter(e => e.active)
+
+    if (activeEntries.length === 0) {
+      return { error: 'Selecteer minimaal één dag' }
+    }
+
+    for (const entry of activeEntries) {
+      if (entry.start_time >= entry.end_time) {
+        const dayNames: Record<number, string> = {
+          1: 'Maandag', 2: 'Dinsdag', 3: 'Woensdag', 4: 'Donderdag',
+          5: 'Vrijdag', 6: 'Zaterdag', 7: 'Zondag'
+        }
+        return { error: `${dayNames[entry.day_of_week]}: eindtijd moet na starttijd liggen` }
+      }
+    }
+
+    const totalHours = activeEntries.reduce((sum, entry) => {
+      const [sh, sm] = entry.start_time.split(':').map(Number)
+      const [eh, em] = entry.end_time.split(':').map(Number)
+      return sum + (eh + em / 60) - (sh + sm / 60)
+    }, 0)
+
+    const { data: minHoursSetting } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'minimum_hours_per_week')
+      .single()
+
+    const minimumHours = minHoursSetting ? Number(minHoursSetting.value) : 16
+
+    if (totalHours < minimumHours) {
+      return { error: `Minimaal ${minimumHours} uur per week vereist. Je hebt nu ${totalHours.toFixed(1)} uur.` }
+    }
+
+    // Get existing pending entries to preserve submission_group and validity
+    const { data: existingPending } = await supabase
+      .from('schedules')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('status', 'pending')
+
+    if (!existingPending || existingPending.length === 0) {
+      return { error: 'Geen pending rooster gevonden om te bewerken' }
+    }
+
+    const submissionGroup = (existingPending[0] as any).submission_group || crypto.randomUUID()
+    const validFrom = (existingPending[0] as any).valid_from
+    const validUntil = (existingPending[0] as any).valid_until
+
+    // Delete existing pending entries
+    // @ts-ignore
+    const { error: deleteError } = await supabase
+      .from('schedules')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('status', 'pending')
+
+    if (deleteError) {
+      console.error('Schedule delete error:', deleteError)
+      return { error: 'Rooster bijwerken mislukt. Probeer het opnieuw.' }
+    }
+
+    // Insert new entries
+    const scheduleRows = activeEntries.map(entry => ({
+      user_id: user.id,
+      day_of_week: entry.day_of_week,
+      start_time: entry.start_time,
+      end_time: entry.end_time,
+      status: 'pending' as const,
+      valid_from: validFrom,
+      valid_until: validUntil,
+      submission_group: submissionGroup,
+    }))
+
+    // @ts-ignore
+    const { error: insertError } = await supabase
+      .from('schedules')
+      .insert(scheduleRows)
+
+    if (insertError) {
+      console.error('Schedule update error:', insertError)
+      return { error: 'Rooster bijwerken mislukt. Probeer het opnieuw.' }
+    }
+
+    revalidatePath('/student/schedule')
+    revalidatePath('/student/dashboard')
+
+    return { success: true }
+  } catch (error) {
+    console.error('Schedule update error:', error)
+    return { error: 'Er is een onverwachte fout opgetreden' }
+  }
+}
+
+export async function deletePendingSchedule() {
+  try {
+    const user = await requireStudent()
+    const supabase = await createClient()
+
+    // @ts-ignore
+    const { error: deleteError } = await supabase
+      .from('schedules')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('status', 'pending')
+
+    if (deleteError) {
+      console.error('Schedule delete error:', deleteError)
+      return { error: 'Rooster verwijderen mislukt. Probeer het opnieuw.' }
+    }
+
+    revalidatePath('/student/schedule')
+    revalidatePath('/student/dashboard')
+
+    return { success: true }
+  } catch (error) {
+    console.error('Schedule delete error:', error)
+    return { error: 'Er is een onverwachte fout opgetreden' }
+  }
+}
+
+export async function savePushSubscription(data: PushSubscriptionInput) {
+  try {
+    const user = await requireStudent()
+    const supabase = await createClient()
+
+    // @ts-ignore
+    const { error } = await supabase
+      .from('push_subscriptions')
+      .upsert(
+        {
+          user_id: user.id,
+          endpoint: data.endpoint,
+          p256dh: data.p256dh,
+          auth: data.auth,
+        },
+        { onConflict: 'endpoint' }
+      )
+
+    if (error) {
+      console.error('Push subscription error:', error)
+      return { error: 'Meldingen inschakelen mislukt' }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error('Push subscription error:', error)
+    return { error: 'Er is een onverwachte fout opgetreden' }
+  }
+}
+
+export async function deletePushSubscription(endpoint: string) {
+  try {
+    const user = await requireStudent()
+    const supabase = await createClient()
+
+    // @ts-ignore
+    const { error } = await supabase
+      .from('push_subscriptions')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('endpoint', endpoint)
+
+    if (error) {
+      console.error('Push unsubscribe error:', error)
+      return { error: 'Meldingen uitschakelen mislukt' }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error('Push unsubscribe error:', error)
     return { error: 'Er is een onverwachte fout opgetreden' }
   }
 }

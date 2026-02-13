@@ -39,6 +39,24 @@ export type LeaveRequestInput = {
   description: string
 }
 
+// Schedule form types
+export type ScheduleEntry = {
+  day_of_week: number
+  active: boolean
+  start_time: string
+  end_time: string
+}
+
+export type ScheduleSubmissionInput = {
+  entries: ScheduleEntry[]
+}
+
+export type PushSubscriptionInput = {
+  endpoint: string
+  p256dh: string
+  auth: string
+}
+
 // View models
 export type DashboardStats = {
   todaySchedule: Schedule | null

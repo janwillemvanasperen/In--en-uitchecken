@@ -1,0 +1,9 @@
+{
+  "name": "Aanwezigheidsregistratie",
+  "short_name": "Check-in",
+  "description": "Check in/uit systeem voor studenten",
+  "start_url": "/student/dashboard",
+  "display": "standalone",
+  "theme_color": "#3b82f6",
+  "background_color": "#ffffff"
+}
