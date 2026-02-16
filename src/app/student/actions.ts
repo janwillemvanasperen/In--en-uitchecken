@@ -150,6 +150,11 @@ export async function submitLeaveRequest(data: LeaveRequestInput) {
       return { error: 'Datum kan niet in het verleden liggen' }
     }
 
+    // Validate times if provided
+    if (data.start_time && data.end_time && data.start_time >= data.end_time) {
+      return { error: 'Eindtijd moet na starttijd liggen' }
+    }
+
     // Insert leave request
     const leaveRequestData: Database['public']['Tables']['leave_requests']['Insert'] = {
       user_id: user.id,
@@ -157,6 +162,8 @@ export async function submitLeaveRequest(data: LeaveRequestInput) {
       reason: data.reason,
       description: data.description || null,
       status: 'pending',
+      start_time: data.start_time || null,
+      end_time: data.end_time || null,
     }
 
     // @ts-ignore - Supabase SSR type inference issue in production build

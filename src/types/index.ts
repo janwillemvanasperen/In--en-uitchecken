@@ -37,6 +37,8 @@ export type LeaveRequestInput = {
   date: string
   reason: LeaveReason
   description: string
+  start_time?: string
+  end_time?: string
 }
 
 // Schedule form types

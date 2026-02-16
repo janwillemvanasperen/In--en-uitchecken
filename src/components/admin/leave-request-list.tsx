@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Loader2, Check, X, MessageSquare } from 'lucide-react'
+import { Loader2, Check, X, MessageSquare, Clock } from 'lucide-react'
 import { approveLeaveRequest, rejectLeaveRequest } from '@/app/admin/actions'
 
 type LeaveWithUser = {
@@ -18,6 +18,8 @@ type LeaveWithUser = {
   description: string | null
   status: string
   admin_note: string | null
+  start_time: string | null
+  end_time: string | null
   created_at: string
   users: { full_name: string } | null
 }
@@ -74,11 +76,19 @@ function LeaveRequestRow({ lr, isPending }: { lr: LeaveWithUser; isPending: bool
           {(lr.users as any)?.full_name || 'Onbekend'}
         </td>
         <td className="px-4 py-3">
-          {new Date(lr.date).toLocaleDateString('nl-NL', {
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric',
-          })}
+          <div>
+            {new Date(lr.date).toLocaleDateString('nl-NL', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            })}
+          </div>
+          {lr.start_time && lr.end_time && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+              <Clock className="h-3 w-3" />
+              {lr.start_time.slice(0, 5)} - {lr.end_time.slice(0, 5)}
+            </p>
+          )}
         </td>
         <td className="px-4 py-3 hidden sm:table-cell">
           {REASON_LABELS[lr.reason] || lr.reason}

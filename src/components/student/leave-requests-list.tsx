@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatDate } from '@/lib/date-utils'
-import { Calendar, FileText } from 'lucide-react'
+import { Calendar, Clock, FileText, MessageSquare } from 'lucide-react'
 import type { LeaveRequest, LeaveReason, LeaveStatus } from '@/types'
 
 interface LeaveRequestsListProps {
@@ -53,6 +53,12 @@ export function LeaveRequestsList({ requests }: LeaveRequestsListProps) {
                       <span className="font-medium">
                         {formatDate(request.date)}
                       </span>
+                      {request.start_time && request.end_time && (
+                        <span className="text-sm text-muted-foreground flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {request.start_time.slice(0, 5)} - {request.end_time.slice(0, 5)}
+                        </span>
+                      )}
                     </div>
                     <Badge variant={statusConfig.variant}>
                       {statusConfig.label}
@@ -69,6 +75,13 @@ export function LeaveRequestsList({ requests }: LeaveRequestsListProps) {
                       {request.description.length > 100
                         ? `${request.description.slice(0, 100)}...`
                         : request.description}
+                    </p>
+                  )}
+
+                  {request.admin_note && (
+                    <p className="text-sm text-muted-foreground pl-6 flex items-center gap-1">
+                      <MessageSquare className="h-3 w-3 shrink-0" />
+                      <span className="italic">{request.admin_note}</span>
                     </p>
                   )}
 

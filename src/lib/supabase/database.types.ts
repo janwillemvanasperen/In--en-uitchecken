@@ -156,6 +156,9 @@ export type Database = {
           reviewed_at: string | null
           created_at: string
           updated_at: string
+          admin_note: string | null
+          start_time: string | null
+          end_time: string | null
         }
         Insert: {
           id?: string
@@ -169,6 +172,9 @@ export type Database = {
           reviewed_at?: string | null
           created_at?: string
           updated_at?: string
+          admin_note?: string | null
+          start_time?: string | null
+          end_time?: string | null
         }
         Update: {
           id?: string
@@ -182,6 +188,9 @@ export type Database = {
           reviewed_at?: string | null
           created_at?: string
           updated_at?: string
+          admin_note?: string | null
+          start_time?: string | null
+          end_time?: string | null
         }
       }
       push_subscriptions: {

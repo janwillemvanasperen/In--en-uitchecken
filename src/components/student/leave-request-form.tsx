@@ -24,6 +24,9 @@ export function LeaveRequestForm() {
   const [date, setDate] = useState('')
   const [reason, setReason] = useState<LeaveReason>('sick')
   const [description, setDescription] = useState('')
+  const [fullDay, setFullDay] = useState(true)
+  const [startTime, setStartTime] = useState('')
+  const [endTime, setEndTime] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -38,20 +41,21 @@ export function LeaveRequestForm() {
       date,
       reason,
       description,
+      start_time: !fullDay && startTime ? startTime : undefined,
+      end_time: !fullDay && endTime ? endTime : undefined,
     })
 
     if (result.error) {
       setError(result.error)
     } else {
       setSuccess(true)
-      // Reset form
       setDate('')
       setReason('sick')
       setDescription('')
-      // Refresh page to show new request
+      setFullDay(true)
+      setStartTime('')
+      setEndTime('')
       router.refresh()
-
-      // Hide success message after 3 seconds
       setTimeout(() => setSuccess(false), 3000)
     }
 
@@ -94,6 +98,45 @@ export function LeaveRequestForm() {
               </SelectContent>
             </Select>
           </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="full-day"
+              checked={fullDay}
+              onChange={(e) => setFullDay(e.target.checked)}
+              disabled={loading}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            <Label htmlFor="full-day" className="font-normal">Hele dag</Label>
+          </div>
+
+          {!fullDay && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="start-time">Van</Label>
+                <Input
+                  id="start-time"
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  disabled={loading}
+                  required={!fullDay}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="end-time">Tot</Label>
+                <Input
+                  id="end-time"
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  disabled={loading}
+                  required={!fullDay}
+                />
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="description">Toelichting</Label>
