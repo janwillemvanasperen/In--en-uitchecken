@@ -64,3 +64,29 @@ export type DashboardStats = {
   weeklyHours: number
   nextSession: Schedule | null
 }
+
+// Admin input types
+export type CreateUserInput = {
+  email: string
+  password: string
+  full_name: string
+  role: 'student' | 'admin'
+}
+
+export type UpdateUserInput = {
+  full_name?: string
+  email?: string
+  role?: 'student' | 'admin'
+}
+
+export type CreateLocationInput = {
+  name: string
+  latitude: number
+  longitude: number
+}
+
+export type UpdateLocationInput = {
+  name?: string
+  latitude?: number
+  longitude?: number
+}
