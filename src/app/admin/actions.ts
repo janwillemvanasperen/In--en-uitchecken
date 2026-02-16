@@ -179,14 +179,17 @@ export async function deleteLocation(id: string) {
 
 // ==================== SCHEDULE MANAGEMENT ====================
 
-export async function approveSchedule(submissionGroup: string) {
+export async function approveSchedule(submissionGroup: string, adminNote?: string) {
   try {
     await requireAdmin()
     const supabase = await createClient()
 
+    const updateData: Record<string, any> = { status: 'approved' }
+    if (adminNote?.trim()) updateData.admin_note = adminNote.trim()
+
     const { error } = await supabase
       .from('schedules')
-      .update({ status: 'approved' })
+      .update(updateData)
       .eq('submission_group', submissionGroup)
 
     if (error) {
@@ -202,14 +205,17 @@ export async function approveSchedule(submissionGroup: string) {
   }
 }
 
-export async function rejectSchedule(submissionGroup: string) {
+export async function rejectSchedule(submissionGroup: string, adminNote?: string) {
   try {
     await requireAdmin()
     const supabase = await createClient()
 
+    const updateData: Record<string, any> = { status: 'rejected' }
+    if (adminNote?.trim()) updateData.admin_note = adminNote.trim()
+
     const { error } = await supabase
       .from('schedules')
-      .update({ status: 'rejected' })
+      .update(updateData)
       .eq('submission_group', submissionGroup)
 
     if (error) {
@@ -227,18 +233,21 @@ export async function rejectSchedule(submissionGroup: string) {
 
 // ==================== LEAVE REQUEST MANAGEMENT ====================
 
-export async function approveLeaveRequest(id: string) {
+export async function approveLeaveRequest(id: string, adminNote?: string) {
   try {
     const admin = await requireAdmin()
     const supabase = await createClient()
 
+    const updateData: Record<string, any> = {
+      status: 'approved',
+      reviewed_by: admin.id,
+      reviewed_at: new Date().toISOString(),
+    }
+    if (adminNote?.trim()) updateData.admin_note = adminNote.trim()
+
     const { error } = await supabase
       .from('leave_requests')
-      .update({
-        status: 'approved',
-        reviewed_by: admin.id,
-        reviewed_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', id)
 
     if (error) {
@@ -254,18 +263,21 @@ export async function approveLeaveRequest(id: string) {
   }
 }
 
-export async function rejectLeaveRequest(id: string) {
+export async function rejectLeaveRequest(id: string, adminNote?: string) {
   try {
     const admin = await requireAdmin()
     const supabase = await createClient()
 
+    const updateData: Record<string, any> = {
+      status: 'rejected',
+      reviewed_by: admin.id,
+      reviewed_at: new Date().toISOString(),
+    }
+    if (adminNote?.trim()) updateData.admin_note = adminNote.trim()
+
     const { error } = await supabase
       .from('leave_requests')
-      .update({
-        status: 'rejected',
-        reviewed_by: admin.id,
-        reviewed_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', id)
 
     if (error) {

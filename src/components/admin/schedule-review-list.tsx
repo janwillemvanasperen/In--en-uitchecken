@@ -4,9 +4,10 @@ import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Loader2, Check, X, ChevronDown, ChevronUp } from 'lucide-react'
+import { Loader2, Check, X, ChevronDown, ChevronUp, MessageSquare } from 'lucide-react'
 import { approveSchedule, rejectSchedule } from '@/app/admin/actions'
 
 type ScheduleRow = {
@@ -19,6 +20,7 @@ type ScheduleRow = {
   valid_from: string
   valid_until: string
   submission_group: string | null
+  admin_note: string | null
   users: { full_name: string } | null
 }
 
@@ -30,6 +32,7 @@ type ScheduleGroup = {
   validUntil: string
   entries: ScheduleRow[]
   totalHours: number
+  adminNote: string | null
 }
 
 const DAY_NAMES: Record<number, string> = {
@@ -62,6 +65,7 @@ function groupSchedules(schedules: ScheduleRow[]): ScheduleGroup[] {
         validUntil: s.valid_until,
         entries: [],
         totalHours: 0,
+        adminNote: s.admin_note || null,
       })
     }
     const group = groups.get(key)!
@@ -86,25 +90,36 @@ function groupSchedules(schedules: ScheduleRow[]): ScheduleGroup[] {
 
 function ScheduleGroupCard({ group }: { group: ScheduleGroup }) {
   const [expanded, setExpanded] = useState(group.status === 'pending')
+  const [showNote, setShowNote] = useState(false)
+  const [note, setNote] = useState('')
+  const [pendingAction, setPendingAction] = useState<'approve' | 'reject' | null>(null)
   const [loadingAction, setLoadingAction] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const badge = STATUS_BADGES[group.status] || STATUS_BADGES.pending
 
-  const handleApprove = async () => {
-    setLoadingAction('approve')
-    setError(null)
-    const result = await approveSchedule(group.submissionGroup)
-    if (result.error) setError(result.error)
-    setLoadingAction(null)
+  const handleAction = (action: 'approve' | 'reject') => {
+    setPendingAction(action)
+    setShowNote(true)
   }
 
-  const handleReject = async () => {
-    setLoadingAction('reject')
+  const handleConfirm = async () => {
+    setLoadingAction(pendingAction)
     setError(null)
-    const result = await rejectSchedule(group.submissionGroup)
+    const result = pendingAction === 'approve'
+      ? await approveSchedule(group.submissionGroup, note || undefined)
+      : await rejectSchedule(group.submissionGroup, note || undefined)
     if (result.error) setError(result.error)
     setLoadingAction(null)
+    setShowNote(false)
+    setNote('')
+    setPendingAction(null)
+  }
+
+  const handleCancel = () => {
+    setShowNote(false)
+    setNote('')
+    setPendingAction(null)
   }
 
   return (
@@ -171,33 +186,57 @@ function ScheduleGroupCard({ group }: { group: ScheduleGroup }) {
             </table>
           </div>
 
-          {group.status === 'pending' && (
+          {group.adminNote && group.status !== 'pending' && (
+            <p className="text-sm text-muted-foreground flex items-center gap-1">
+              <MessageSquare className="h-3 w-3 shrink-0" />
+              {group.adminNote}
+            </p>
+          )}
+
+          {group.status === 'pending' && !showNote && (
             <div className="flex gap-2">
               <Button
                 size="sm"
-                onClick={handleApprove}
+                onClick={() => handleAction('approve')}
                 disabled={!!loadingAction}
               >
-                {loadingAction === 'approve' ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Check className="mr-2 h-4 w-4" />
-                )}
+                <Check className="mr-2 h-4 w-4" />
                 Goedkeuren
               </Button>
               <Button
                 size="sm"
                 variant="destructive"
-                onClick={handleReject}
+                onClick={() => handleAction('reject')}
                 disabled={!!loadingAction}
               >
-                {loadingAction === 'reject' ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <X className="mr-2 h-4 w-4" />
-                )}
+                <X className="mr-2 h-4 w-4" />
                 Afwijzen
               </Button>
+            </div>
+          )}
+
+          {showNote && (
+            <div className="space-y-2">
+              <Textarea
+                placeholder="Reactie (optioneel)..."
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                rows={2}
+              />
+              <div className="flex gap-2 justify-end">
+                <Button size="sm" variant="ghost" onClick={handleCancel} disabled={!!loadingAction}>
+                  Annuleren
+                </Button>
+                <Button
+                  size="sm"
+                  variant={pendingAction === 'reject' ? 'destructive' : 'default'}
+                  onClick={handleConfirm}
+                  disabled={!!loadingAction}
+                >
+                  {loadingAction && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {pendingAction === 'approve' ? 'Goedkeuren' : 'Afwijzen'}
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>
