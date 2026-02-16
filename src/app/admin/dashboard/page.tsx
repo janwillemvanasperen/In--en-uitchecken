@@ -28,7 +28,7 @@ export default async function AdminDashboard() {
     supabase.from('leave_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase.from('locations').select('*', { count: 'exact', head: true }),
     supabase.from('check_ins').select('*', { count: 'exact', head: true }).is('check_out_time', null),
-    supabase.from('check_ins').select('*, users(full_name), locations(name)').order('check_in_time', { ascending: false }).limit(5),
+    supabase.from('check_ins').select('*, users!check_ins_user_id_fkey(full_name), locations!check_ins_location_id_fkey(name)').order('check_in_time', { ascending: false }).limit(5),
   ])
 
   const navCards = [

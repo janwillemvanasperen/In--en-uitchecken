@@ -14,7 +14,7 @@ export default async function AdminCheckInsPage() {
 
   const { data: checkIns } = await supabase
     .from('check_ins')
-    .select('*, users(full_name), locations(name)')
+    .select('*, users!check_ins_user_id_fkey(full_name), locations!check_ins_location_id_fkey(name)')
     .order('check_in_time', { ascending: false })
     .limit(500)
 

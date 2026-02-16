@@ -14,7 +14,7 @@ export default async function AdminLeaveRequestsPage() {
 
   const { data: leaveRequests } = await supabase
     .from('leave_requests')
-    .select('*, users(full_name)')
+    .select('*, users!leave_requests_user_id_fkey(full_name)')
     .order('created_at', { ascending: false })
 
   return (

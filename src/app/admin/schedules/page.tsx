@@ -14,7 +14,7 @@ export default async function AdminSchedulesPage() {
 
   const { data: schedules } = await supabase
     .from('schedules')
-    .select('*, users(full_name)')
+    .select('*, users!schedules_user_id_fkey(full_name)')
     .order('created_at', { ascending: false })
 
   return (
