@@ -13,10 +13,10 @@ export default async function AdminUsersPage() {
   await requireAdmin()
   const supabase = await createClient()
 
-  const { data: users } = await supabase
-    .from('users')
-    .select('*')
-    .order('full_name')
+  const [{ data: users }, { data: coaches }] = await Promise.all([
+    supabase.from('users').select('*').order('full_name'),
+    supabase.from('coaches').select('*').order('name'),
+  ])
 
   return (
     <div className="min-h-screen bg-background">
@@ -33,8 +33,8 @@ export default async function AdminUsersPage() {
       </header>
 
       <main className="container mx-auto px-4 py-8 max-w-4xl space-y-6">
-        <UserForm />
-        <UserList users={users || []} />
+        <UserForm coaches={coaches || []} />
+        <UserList users={users || []} coaches={coaches || []} />
       </main>
     </div>
   )

@@ -16,6 +16,15 @@ export default async function StudentDashboard() {
   const user = await requireStudent()
   const supabase = await createClient()
 
+  // Get coach name if assigned
+  const { data: userProfile } = await supabase
+    .from('users')
+    .select('coach_id, coaches!users_coach_id_fkey(name)')
+    .eq('id', user.id)
+    .single()
+
+  const coachName = (userProfile as any)?.coaches?.name || null
+
   // Get today's day of week (1 = Monday, 7 = Sunday)
   const today = new Date()
   const dayOfWeek = today.getDay() || 7
@@ -74,7 +83,12 @@ export default async function StudentDashboard() {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold">Student Dashboard</h1>
           <div className="flex items-center gap-4">
-            <p className="text-sm text-muted-foreground">{user.full_name}</p>
+            <div className="text-right">
+              <p className="text-sm text-muted-foreground">{user.full_name}</p>
+              {coachName && (
+                <p className="text-xs text-muted-foreground">Coach: {coachName}</p>
+              )}
+            </div>
             <LogoutButton />
           </div>
         </div>

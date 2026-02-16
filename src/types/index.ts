@@ -7,6 +7,7 @@ export type CheckIn = Database['public']['Tables']['check_ins']['Row']
 export type Location = Database['public']['Tables']['locations']['Row']
 export type LeaveRequest = Database['public']['Tables']['leave_requests']['Row']
 export type Settings = Database['public']['Tables']['settings']['Row']
+export type Coach = Database['public']['Tables']['coaches']['Row']
 
 // Composite types with relations
 export type CheckInWithLocation = CheckIn & {
@@ -73,12 +74,14 @@ export type CreateUserInput = {
   password: string
   full_name: string
   role: 'student' | 'admin'
+  coach_id?: string | null
 }
 
 export type UpdateUserInput = {
   full_name?: string
   email?: string
   role?: 'student' | 'admin'
+  coach_id?: string | null
 }
 
 export type CreateLocationInput = {

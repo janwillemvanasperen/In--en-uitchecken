@@ -25,6 +25,14 @@ export async function createUser(data: CreateUserInput) {
       },
     })
 
+    // Set coach_id if provided (trigger creates the user first, then we update)
+    if (!authError && authData?.user && data.coach_id) {
+      await adminClient
+        .from('users')
+        .update({ coach_id: data.coach_id })
+        .eq('id', authData.user.id)
+    }
+
     if (authError) {
       return { error: `Account aanmaken mislukt: ${authError.message}` }
     }
@@ -43,10 +51,11 @@ export async function updateUser(userId: string, data: UpdateUserInput) {
     await requireAdmin()
     const adminClient = createAdminClient()
 
-    const updateData: Record<string, string> = {}
+    const updateData: Record<string, any> = {}
     if (data.full_name) updateData.full_name = data.full_name
     if (data.email) updateData.email = data.email
     if (data.role) updateData.role = data.role
+    if (data.coach_id !== undefined) updateData.coach_id = data.coach_id || null
 
     const { error } = await adminClient
       .from('users')
@@ -289,6 +298,84 @@ export async function rejectLeaveRequest(id: string, adminNote?: string) {
     return { success: true }
   } catch (error) {
     console.error('Reject leave error:', error)
+    return { error: 'Er is een onverwachte fout opgetreden' }
+  }
+}
+
+// ==================== COACH MANAGEMENT ====================
+
+export async function createCoach(name: string) {
+  try {
+    await requireAdmin()
+    const supabase = await createClient()
+
+    const { error } = await supabase
+      .from('coaches')
+      .insert({ name: name.trim() })
+
+    if (error) {
+      if (error.code === '23505') return { error: 'Een coach met deze naam bestaat al' }
+      return { error: `Coach aanmaken mislukt: ${error.message}` }
+    }
+
+    revalidatePath('/admin/coaches')
+    revalidatePath('/admin/users')
+    revalidatePath('/admin/dashboard')
+    return { success: true }
+  } catch (error) {
+    console.error('Create coach error:', error)
+    return { error: 'Er is een onverwachte fout opgetreden' }
+  }
+}
+
+export async function updateCoach(id: string, data: { name?: string; active?: boolean }) {
+  try {
+    await requireAdmin()
+    const supabase = await createClient()
+
+    const updateData: Record<string, any> = {}
+    if (data.name !== undefined) updateData.name = data.name.trim()
+    if (data.active !== undefined) updateData.active = data.active
+
+    const { error } = await supabase
+      .from('coaches')
+      .update(updateData)
+      .eq('id', id)
+
+    if (error) {
+      if (error.code === '23505') return { error: 'Een coach met deze naam bestaat al' }
+      return { error: `Coach bijwerken mislukt: ${error.message}` }
+    }
+
+    revalidatePath('/admin/coaches')
+    revalidatePath('/admin/users')
+    return { success: true }
+  } catch (error) {
+    console.error('Update coach error:', error)
+    return { error: 'Er is een onverwachte fout opgetreden' }
+  }
+}
+
+export async function deleteCoach(id: string) {
+  try {
+    await requireAdmin()
+    const supabase = await createClient()
+
+    const { error } = await supabase
+      .from('coaches')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      return { error: `Coach verwijderen mislukt: ${error.message}` }
+    }
+
+    revalidatePath('/admin/coaches')
+    revalidatePath('/admin/users')
+    revalidatePath('/admin/dashboard')
+    return { success: true }
+  } catch (error) {
+    console.error('Delete coach error:', error)
     return { error: 'Er is een onverwachte fout opgetreden' }
   }
 }

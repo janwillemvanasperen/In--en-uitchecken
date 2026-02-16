@@ -9,23 +9,27 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Loader2, UserPlus } from 'lucide-react'
 import { createUser, updateUser } from '@/app/admin/actions'
-import type { User } from '@/types'
+import type { User, Coach } from '@/types'
 
 export function UserForm({
   user,
+  coaches = [],
   onDone,
 }: {
   user?: User
+  coaches?: Coach[]
   onDone?: () => void
 }) {
   const [fullName, setFullName] = useState(user?.full_name || '')
   const [email, setEmail] = useState(user?.email || '')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState<'student' | 'admin'>(user?.role || 'student')
+  const [coachId, setCoachId] = useState<string>(user?.coach_id || '__none__')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const isEditing = !!user
+  const activeCoaches = coaches.filter((c) => c.active)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,9 +48,11 @@ export function UserForm({
       return
     }
 
+    const selectedCoachId = coachId === '__none__' ? null : coachId
+
     const result = isEditing
-      ? await updateUser(user.id, { full_name: fullName.trim(), email: email.trim(), role })
-      : await createUser({ full_name: fullName.trim(), email: email.trim(), password, role })
+      ? await updateUser(user.id, { full_name: fullName.trim(), email: email.trim(), role, coach_id: selectedCoachId })
+      : await createUser({ full_name: fullName.trim(), email: email.trim(), password, role, coach_id: selectedCoachId })
 
     if (result.error) {
       setError(result.error)
@@ -56,6 +62,7 @@ export function UserForm({
         setEmail('')
         setPassword('')
         setRole('student')
+        setCoachId('__none__')
       }
       onDone?.()
     }
@@ -125,6 +132,24 @@ export function UserForm({
               </SelectContent>
             </Select>
           </div>
+          {role === 'student' && activeCoaches.length > 0 && (
+            <div>
+              <Label htmlFor="user-coach">Coach</Label>
+              <Select value={coachId} onValueChange={setCoachId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecteer coach" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Geen coach</SelectItem>
+                  {activeCoaches.map((coach) => (
+                    <SelectItem key={coach.id} value={coach.id}>
+                      {coach.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <Button type="submit" disabled={isLoading} className="w-full">
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isEditing ? 'Opslaan' : (

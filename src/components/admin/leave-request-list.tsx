@@ -7,8 +7,10 @@ import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Loader2, Check, X, MessageSquare, Clock } from 'lucide-react'
 import { approveLeaveRequest, rejectLeaveRequest } from '@/app/admin/actions'
+import type { Coach } from '@/types'
 
 type LeaveWithUser = {
   id: string
@@ -170,10 +172,26 @@ function LeaveRequestRow({ lr, isPending }: { lr: LeaveWithUser; isPending: bool
   )
 }
 
-export function LeaveRequestList({ leaveRequests }: { leaveRequests: LeaveWithUser[] }) {
-  const pending = leaveRequests.filter((lr) => lr.status === 'pending')
-  const approved = leaveRequests.filter((lr) => lr.status === 'approved')
-  const rejected = leaveRequests.filter((lr) => lr.status === 'rejected')
+export function LeaveRequestList({
+  leaveRequests,
+  coaches = [],
+  userCoachMap = {},
+}: {
+  leaveRequests: LeaveWithUser[]
+  coaches?: Coach[]
+  userCoachMap?: Record<string, string | null>
+}) {
+  const [coachFilter, setCoachFilter] = useState('__all__')
+
+  const filtered = leaveRequests.filter((lr) => {
+    if (coachFilter === '__all__') return true
+    if (coachFilter === '__none__') return !userCoachMap[lr.user_id]
+    return userCoachMap[lr.user_id] === coachFilter
+  })
+
+  const pending = filtered.filter((lr) => lr.status === 'pending')
+  const approved = filtered.filter((lr) => lr.status === 'approved')
+  const rejected = filtered.filter((lr) => lr.status === 'rejected')
 
   const renderTable = (items: LeaveWithUser[]) => {
     if (items.length === 0) {
@@ -214,6 +232,23 @@ export function LeaveRequestList({ leaveRequests }: { leaveRequests: LeaveWithUs
   }
 
   return (
+    <div className="space-y-4">
+      {coaches.length > 0 && (
+        <div className="flex gap-3 items-center">
+          <Select value={coachFilter} onValueChange={setCoachFilter}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Filter op coach" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Alle coaches</SelectItem>
+              <SelectItem value="__none__">Geen coach</SelectItem>
+              {coaches.map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
     <Tabs defaultValue="pending">
       <TabsList>
         <TabsTrigger value="pending">
@@ -230,5 +265,6 @@ export function LeaveRequestList({ leaveRequests }: { leaveRequests: LeaveWithUs
       <TabsContent value="approved">{renderTable(approved)}</TabsContent>
       <TabsContent value="rejected">{renderTable(rejected)}</TabsContent>
     </Tabs>
+    </div>
   )
 }

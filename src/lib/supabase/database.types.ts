@@ -15,6 +15,7 @@ export type Database = {
           email: string
           role: 'student' | 'admin'
           full_name: string
+          coach_id: string | null
           created_at: string
           updated_at: string
         }
@@ -23,6 +24,7 @@ export type Database = {
           email: string
           role?: 'student' | 'admin'
           full_name: string
+          coach_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -31,8 +33,29 @@ export type Database = {
           email?: string
           role?: 'student' | 'admin'
           full_name?: string
+          coach_id?: string | null
           created_at?: string
           updated_at?: string
+        }
+      }
+      coaches: {
+        Row: {
+          id: string
+          name: string
+          active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          active?: boolean
+          created_at?: string
         }
       }
       locations: {

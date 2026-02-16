@@ -12,10 +12,16 @@ export default async function AdminLeaveRequestsPage() {
   await requireAdmin()
   const supabase = await createClient()
 
-  const { data: leaveRequests } = await supabase
-    .from('leave_requests')
-    .select('*, users!leave_requests_user_id_fkey(full_name)')
-    .order('created_at', { ascending: false })
+  const [{ data: leaveRequests }, { data: coaches }, { data: usersData }] = await Promise.all([
+    supabase.from('leave_requests').select('*, users!leave_requests_user_id_fkey(full_name)').order('created_at', { ascending: false }),
+    supabase.from('coaches').select('*').eq('active', true).order('name'),
+    supabase.from('users').select('id, coach_id').eq('role', 'student'),
+  ])
+
+  const userCoachMap: Record<string, string | null> = {}
+  for (const u of usersData || []) {
+    userCoachMap[u.id] = u.coach_id || null
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -32,7 +38,7 @@ export default async function AdminLeaveRequestsPage() {
       </header>
 
       <main className="container mx-auto px-4 py-8 max-w-4xl">
-        <LeaveRequestList leaveRequests={leaveRequests || []} />
+        <LeaveRequestList leaveRequests={leaveRequests || []} coaches={coaches || []} userCoachMap={userCoachMap} />
       </main>
     </div>
   )

@@ -14,23 +14,32 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Loader2, Trash2, Pencil, Search, Download } from 'lucide-react'
 import { deleteUser } from '@/app/admin/actions'
 import { UserForm } from './user-form'
-import type { User } from '@/types'
+import type { User, Coach } from '@/types'
 
-export function UserList({ users }: { users: User[] }) {
+export function UserList({ users, coaches = [] }: { users: User[]; coaches?: Coach[] }) {
   const [search, setSearch] = useState('')
+  const [coachFilter, setCoachFilter] = useState('__all__')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const filteredUsers = users.filter(
-    (u) =>
+  const coachMap = Object.fromEntries(coaches.map((c) => [c.id, c.name]))
+
+  const filteredUsers = users.filter((u) => {
+    const matchesSearch =
       u.full_name.toLowerCase().includes(search.toLowerCase()) ||
       u.email.toLowerCase().includes(search.toLowerCase())
-  )
+    const matchesCoach =
+      coachFilter === '__all__' ||
+      (coachFilter === '__none__' && !u.coach_id) ||
+      u.coach_id === coachFilter
+    return matchesSearch && matchesCoach
+  })
 
   const handleDelete = async () => {
     if (!deletingId) return
@@ -47,11 +56,12 @@ export function UserList({ users }: { users: User[] }) {
   }
 
   const handleExportCSV = () => {
-    const headers = ['Naam', 'Email', 'Rol', 'Aangemaakt']
+    const headers = ['Naam', 'Email', 'Rol', 'Coach', 'Aangemaakt']
     const rows = filteredUsers.map((u) => [
       u.full_name,
       u.email,
       u.role,
+      u.coach_id ? (coachMap[u.coach_id] || '') : '',
       new Date(u.created_at).toLocaleDateString('nl-NL'),
     ])
 
@@ -75,8 +85,8 @@ export function UserList({ users }: { users: User[] }) {
         </Alert>
       )}
 
-      <div className="flex gap-3">
-        <div className="relative flex-1">
+      <div className="flex gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Zoek op naam of email..."
@@ -85,6 +95,22 @@ export function UserList({ users }: { users: User[] }) {
             className="pl-10"
           />
         </div>
+        {coaches.length > 0 && (
+          <Select value={coachFilter} onValueChange={setCoachFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filter coach" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Alle coaches</SelectItem>
+              <SelectItem value="__none__">Geen coach</SelectItem>
+              {coaches.map((coach) => (
+                <SelectItem key={coach.id} value={coach.id}>
+                  {coach.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Button variant="outline" onClick={handleExportCSV}>
           <Download className="h-4 w-4 mr-2" />
           CSV
@@ -105,6 +131,7 @@ export function UserList({ users }: { users: User[] }) {
                 <th className="text-left px-4 py-3 font-medium">Naam</th>
                 <th className="text-left px-4 py-3 font-medium hidden sm:table-cell">Email</th>
                 <th className="text-left px-4 py-3 font-medium">Rol</th>
+                <th className="text-left px-4 py-3 font-medium hidden md:table-cell">Coach</th>
                 <th className="text-right px-4 py-3 font-medium">Acties</th>
               </tr>
             </thead>
@@ -112,8 +139,8 @@ export function UserList({ users }: { users: User[] }) {
               {filteredUsers.map((user) => (
                 <tr key={user.id}>
                   {editingId === user.id ? (
-                    <td colSpan={4} className="p-4">
-                      <UserForm user={user} onDone={() => setEditingId(null)} />
+                    <td colSpan={5} className="p-4">
+                      <UserForm user={user} coaches={coaches} onDone={() => setEditingId(null)} />
                     </td>
                   ) : (
                     <>
@@ -130,6 +157,9 @@ export function UserList({ users }: { users: User[] }) {
                         <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
                           {user.role === 'admin' ? 'Admin' : 'Student'}
                         </Badge>
+                      </td>
+                      <td className="px-4 py-3 hidden md:table-cell text-muted-foreground">
+                        {user.coach_id ? (coachMap[user.coach_id] || '-') : '-'}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-2">

@@ -7,8 +7,10 @@ import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Loader2, Check, X, ChevronDown, ChevronUp, MessageSquare } from 'lucide-react'
 import { approveSchedule, rejectSchedule } from '@/app/admin/actions'
+import type { Coach } from '@/types'
 
 type ScheduleRow = {
   id: string
@@ -26,6 +28,7 @@ type ScheduleRow = {
 
 type ScheduleGroup = {
   submissionGroup: string
+  userId: string
   userName: string
   status: string
   validFrom: string
@@ -59,6 +62,7 @@ function groupSchedules(schedules: ScheduleRow[]): ScheduleGroup[] {
     if (!groups.has(key)) {
       groups.set(key, {
         submissionGroup: key,
+        userId: s.user_id,
         userName: (s.users as any)?.full_name || 'Onbekend',
         status: s.status,
         validFrom: s.valid_from,
@@ -245,12 +249,28 @@ function ScheduleGroupCard({ group }: { group: ScheduleGroup }) {
   )
 }
 
-export function ScheduleReviewList({ schedules }: { schedules: ScheduleRow[] }) {
-  const groups = groupSchedules(schedules)
+export function ScheduleReviewList({
+  schedules,
+  coaches = [],
+  userCoachMap = {},
+}: {
+  schedules: ScheduleRow[]
+  coaches?: Coach[]
+  userCoachMap?: Record<string, string | null>
+}) {
+  const [coachFilter, setCoachFilter] = useState('__all__')
 
-  const pending = groups.filter((g) => g.status === 'pending')
-  const approved = groups.filter((g) => g.status === 'approved')
-  const rejected = groups.filter((g) => g.status === 'rejected')
+  const allGroups = groupSchedules(schedules)
+
+  const filteredGroups = allGroups.filter((g) => {
+    if (coachFilter === '__all__') return true
+    if (coachFilter === '__none__') return !userCoachMap[g.userId]
+    return userCoachMap[g.userId] === coachFilter
+  })
+
+  const pending = filteredGroups.filter((g) => g.status === 'pending')
+  const approved = filteredGroups.filter((g) => g.status === 'approved')
+  const rejected = filteredGroups.filter((g) => g.status === 'rejected')
 
   const renderGroups = (items: ScheduleGroup[]) => {
     if (items.length === 0) {
@@ -273,21 +293,37 @@ export function ScheduleReviewList({ schedules }: { schedules: ScheduleRow[] }) 
   }
 
   return (
-    <Tabs defaultValue="pending">
-      <TabsList>
-        <TabsTrigger value="pending">
-          In afwachting ({pending.length})
-        </TabsTrigger>
-        <TabsTrigger value="approved">
-          Goedgekeurd ({approved.length})
-        </TabsTrigger>
-        <TabsTrigger value="rejected">
-          Afgewezen ({rejected.length})
-        </TabsTrigger>
-      </TabsList>
-      <TabsContent value="pending">{renderGroups(pending)}</TabsContent>
-      <TabsContent value="approved">{renderGroups(approved)}</TabsContent>
-      <TabsContent value="rejected">{renderGroups(rejected)}</TabsContent>
-    </Tabs>
+    <div className="space-y-4">
+      {coaches.length > 0 && (
+        <Select value={coachFilter} onValueChange={setCoachFilter}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Filter op coach" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">Alle coaches</SelectItem>
+            <SelectItem value="__none__">Geen coach</SelectItem>
+            {coaches.map((c) => (
+              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+      <Tabs defaultValue="pending">
+        <TabsList>
+          <TabsTrigger value="pending">
+            In afwachting ({pending.length})
+          </TabsTrigger>
+          <TabsTrigger value="approved">
+            Goedgekeurd ({approved.length})
+          </TabsTrigger>
+          <TabsTrigger value="rejected">
+            Afgewezen ({rejected.length})
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="pending">{renderGroups(pending)}</TabsContent>
+        <TabsContent value="approved">{renderGroups(approved)}</TabsContent>
+        <TabsContent value="rejected">{renderGroups(rejected)}</TabsContent>
+      </Tabs>
+    </div>
   )
 }

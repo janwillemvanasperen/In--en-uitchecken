@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { LogoutButton } from '@/components/logout-button'
-import { Users, MapPin, Calendar, Clock, FileText, Settings, ClipboardCheck } from 'lucide-react'
+import { Users, MapPin, Calendar, Clock, FileText, Settings, ClipboardCheck, GraduationCap } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,6 +22,7 @@ export default async function AdminDashboard() {
     { count: locationsCount },
     { count: activeCheckIns },
     { data: recentCheckIns },
+    { count: coachCount },
   ] = await Promise.all([
     supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'student'),
     supabase.from('schedules').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
@@ -29,10 +30,12 @@ export default async function AdminDashboard() {
     supabase.from('locations').select('*', { count: 'exact', head: true }),
     supabase.from('check_ins').select('*', { count: 'exact', head: true }).is('check_out_time', null),
     supabase.from('check_ins').select('*, users!check_ins_user_id_fkey(full_name), locations!check_ins_location_id_fkey(name)').order('check_in_time', { ascending: false }).limit(5),
+    supabase.from('coaches').select('*', { count: 'exact', head: true }).eq('active', true),
   ])
 
   const navCards = [
     { title: 'Gebruikersbeheer', description: 'Beheer student accounts', href: '/admin/users', icon: Users },
+    { title: 'Coaches', description: 'Beheer coaches en groepen', href: '/admin/coaches', icon: GraduationCap, badge: coachCount },
     { title: 'Locatiebeheer', description: 'Voeg locaties toe of bewerk ze', href: '/admin/locations', icon: MapPin },
     { title: 'Roostergoedkeuring', description: 'Keur student roosters goed', href: '/admin/schedules', icon: Calendar, badge: pendingSchedules },
     { title: 'Verlofgoedkeuring', description: 'Keur verlofaanvragen goed of af', href: '/admin/leave-requests', icon: FileText, badge: pendingLeave },
