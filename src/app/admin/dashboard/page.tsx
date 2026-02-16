@@ -6,13 +6,18 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { LogoutButton } from '@/components/logout-button'
-import { Users, MapPin, Calendar, Clock, FileText, Settings, ClipboardCheck, GraduationCap } from 'lucide-react'
+import { Users, MapPin, Calendar, Clock, FileText, Settings, ClipboardCheck, GraduationCap, UserCheck } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminDashboard() {
   const user = await requireAdmin()
   const supabase = await createClient()
+
+  // Get today info for schedule count
+  const today = new Date()
+  const dayOfWeek = today.getDay() || 7
+  const todayStr = today.toISOString().split('T')[0]
 
   // Get statistics
   const [
@@ -23,6 +28,7 @@ export default async function AdminDashboard() {
     { count: activeCheckIns },
     { data: recentCheckIns },
     { count: coachCount },
+    { count: scheduledTodayCount },
   ] = await Promise.all([
     supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'student'),
     supabase.from('schedules').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
@@ -31,9 +37,11 @@ export default async function AdminDashboard() {
     supabase.from('check_ins').select('*', { count: 'exact', head: true }).is('check_out_time', null),
     supabase.from('check_ins').select('*, users!check_ins_user_id_fkey(full_name), locations!check_ins_location_id_fkey(name)').order('check_in_time', { ascending: false }).limit(5),
     supabase.from('coaches').select('*', { count: 'exact', head: true }).eq('active', true),
+    supabase.from('schedules').select('*', { count: 'exact', head: true }).eq('day_of_week', dayOfWeek).eq('status', 'approved').lte('valid_from', todayStr).gte('valid_until', todayStr),
   ])
 
   const navCards = [
+    { title: 'Mijn Studenten', description: 'Overzicht en voortgang per student', href: '/admin/my-students', icon: UserCheck, badge: activeCheckIns },
     { title: 'Gebruikersbeheer', description: 'Beheer student accounts', href: '/admin/users', icon: Users },
     { title: 'Coaches', description: 'Beheer coaches en groepen', href: '/admin/coaches', icon: GraduationCap, badge: coachCount },
     { title: 'Locatiebeheer', description: 'Voeg locaties toe of bewerk ze', href: '/admin/locations', icon: MapPin },
@@ -94,6 +102,31 @@ export default async function AdminDashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Studenten Vandaag widget */}
+        <Card className="mt-6">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <UserCheck className="h-4 w-4" />
+              Studenten vandaag
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-6">
+              <div>
+                <p className="text-2xl font-bold text-green-600">{activeCheckIns || 0}</p>
+                <p className="text-xs text-muted-foreground">nu actief</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{scheduledTodayCount || 0}</p>
+                <p className="text-xs text-muted-foreground">ingepland</p>
+              </div>
+              <Link href="/admin/my-students" className="ml-auto">
+                <Button variant="outline" size="sm">Bekijk studenten</Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Recent activity */}
         {recentCheckIns && recentCheckIns.length > 0 && (
