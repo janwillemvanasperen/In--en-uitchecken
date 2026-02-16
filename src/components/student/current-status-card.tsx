@@ -1,11 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
 import { formatDuration } from '@/lib/date-utils'
-import { Clock, MapPin } from 'lucide-react'
+import { Clock, MapPin, LogIn, LogOut } from 'lucide-react'
+import Link from 'next/link'
 import type { ActiveCheckIn } from '@/types'
 
 interface CurrentStatusCardProps {
@@ -32,10 +34,8 @@ export function CurrentStatusCard({ initialCheckIn, userId }: CurrentStatusCardP
         },
         async (payload) => {
           if (payload.eventType === 'INSERT') {
-            // New check-in created
             const newCheckIn = payload.new as any
             if (!newCheckIn.check_out_time) {
-              // Fetch with location data
               const { data } = await supabase
                 .from('check_ins')
                 .select('*, locations(*)')
@@ -46,7 +46,6 @@ export function CurrentStatusCard({ initialCheckIn, userId }: CurrentStatusCardP
               }
             }
           } else if (payload.eventType === 'UPDATE') {
-            // Check-in updated (likely checked out)
             const updatedCheckIn = payload.new as any
             if (updatedCheckIn.check_out_time && activeCheckIn?.id === updatedCheckIn.id) {
               setActiveCheckIn(null)
@@ -69,12 +68,10 @@ export function CurrentStatusCard({ initialCheckIn, userId }: CurrentStatusCardP
       return
     }
 
-    // Calculate initial elapsed time
     const checkInTime = new Date(activeCheckIn.check_in_time).getTime()
     const initialElapsed = Math.floor((Date.now() - checkInTime) / 1000)
     setElapsedTime(initialElapsed)
 
-    // Update every second
     const interval = setInterval(() => {
       const now = Date.now()
       const elapsed = Math.floor((now - checkInTime) / 1000)
@@ -86,21 +83,26 @@ export function CurrentStatusCard({ initialCheckIn, userId }: CurrentStatusCardP
 
   if (!activeCheckIn) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            Status
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <Badge variant="secondary" className="text-sm">
-              Uitgecheckt
-            </Badge>
-            <p className="text-sm text-muted-foreground">
-              Je bent momenteel niet ingecheckt
-            </p>
+      <Card className="md:col-span-2 lg:col-span-3 border-2 border-dashed">
+        <CardContent className="py-8">
+          <div className="flex flex-col items-center text-center space-y-4">
+            <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center">
+              <Clock className="h-7 w-7 text-muted-foreground" />
+            </div>
+            <div>
+              <Badge variant="secondary" className="text-sm mb-2">
+                Uitgecheckt
+              </Badge>
+              <p className="text-sm text-muted-foreground">
+                Je bent momenteel niet ingecheckt
+              </p>
+            </div>
+            <Link href="/student/check-in">
+              <Button size="lg" className="text-lg px-8 py-6">
+                <LogIn className="h-5 w-5 mr-2" />
+                Check in
+              </Button>
+            </Link>
           </div>
         </CardContent>
       </Card>
@@ -108,30 +110,31 @@ export function CurrentStatusCard({ initialCheckIn, userId }: CurrentStatusCardP
   }
 
   return (
-    <Card className="border-green-200 bg-green-50/50">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Clock className="h-5 w-5 text-green-600" />
-          Status
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
+    <Card className="md:col-span-2 lg:col-span-3 border-2 border-green-300 bg-green-50/50">
+      <CardContent className="py-8">
+        <div className="flex flex-col items-center text-center space-y-4">
           <Badge className="bg-green-600 text-sm">
             Ingecheckt
           </Badge>
 
           <div className="flex items-center gap-2 text-muted-foreground">
             <MapPin className="h-4 w-4" />
-            <span className="text-sm">{activeCheckIn.locations.name}</span>
+            <span>{activeCheckIn.locations.name}</span>
           </div>
 
-          <div className="mt-4">
+          <div>
             <p className="text-xs text-muted-foreground mb-1">Tijd ingecheckt</p>
-            <p className="text-3xl font-bold text-green-600">
+            <p className="text-4xl font-bold text-green-600">
               {formatDuration(elapsedTime)}
             </p>
           </div>
+
+          <Link href="/student/check-in">
+            <Button size="lg" variant="destructive" className="text-lg px-8 py-6">
+              <LogOut className="h-5 w-5 mr-2" />
+              Check uit
+            </Button>
+          </Link>
         </div>
       </CardContent>
     </Card>

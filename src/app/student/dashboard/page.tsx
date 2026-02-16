@@ -95,56 +95,24 @@ export default async function StudentDashboard() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        {/* Top row: Status, Schedule, Progress */}
+        {/* Hero: Status + Check-in button */}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-6">
           <CurrentStatusCard
             initialCheckIn={activeCheckIn}
             userId={user.id}
           />
+        </div>
 
+        {/* Info row: Schedule, Progress, Next session */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-6">
           <TodayScheduleCard schedule={todaySchedule} />
 
           <WeeklyProgressCard weeklyHours={weeklyHours || 0} />
-        </div>
 
-        {/* Second row: Next session and quick actions */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-6">
           <NextSessionCard
             nextSession={nextSession}
             isCheckedIn={!!activeCheckIn}
           />
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Check in/uit</CardTitle>
-              <CardDescription>
-                Start of beëindig je sessie
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link href="/student/check-in">
-                <Button className="w-full">
-                  Check in/uit
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Geschiedenis</CardTitle>
-              <CardDescription>
-                Bekijk al je check-ins
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link href="/student/history">
-                <Button variant="outline" className="w-full">
-                  Bekijk geschiedenis
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
         </div>
 
         <Card className="mt-6">
@@ -181,7 +149,21 @@ export default async function StudentDashboard() {
           </CardContent>
         </Card>
 
-        <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Geschiedenis</CardTitle>
+              <CardDescription>Bekijk al je check-ins</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/student/history">
+                <Button variant="outline" className="w-full">
+                  Bekijk geschiedenis
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Rooster beheren</CardTitle>
