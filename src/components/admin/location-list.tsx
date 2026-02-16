@@ -98,8 +98,10 @@ export function LocationList({ locations }: { locations: Location[] }) {
                 </CardHeader>
                 <CardContent>
                   <div className="text-sm text-muted-foreground space-y-1">
-                    <p>Coördinaten: {location.latitude}, {location.longitude}</p>
-                    <p className="font-mono text-xs">QR: {location.qr_code}</p>
+                    {(location as any).address && (
+                      <p>{(location as any).address}</p>
+                    )}
+                    <p className="text-xs">Coördinaten: {location.latitude}, {location.longitude}</p>
                   </div>
                 </CardContent>
               </Card>

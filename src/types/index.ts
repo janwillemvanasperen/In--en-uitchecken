@@ -81,12 +81,14 @@ export type UpdateUserInput = {
 
 export type CreateLocationInput = {
   name: string
+  address: string
   latitude: number
   longitude: number
 }
 
 export type UpdateLocationInput = {
   name?: string
+  address?: string
   latitude?: number
   longitude?: number
 }

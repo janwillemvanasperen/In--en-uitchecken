@@ -6,9 +6,27 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Loader2, Plus } from 'lucide-react'
+import { Loader2, Plus, MapPin } from 'lucide-react'
 import { createLocation, updateLocation } from '@/app/admin/actions'
 import type { Location } from '@/types'
+
+async function geocodeAddress(address: string): Promise<{ lat: number; lng: number; display: string } | null> {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&countrycodes=nl`,
+      { headers: { 'Accept-Language': 'nl' } }
+    )
+    const data = await res.json()
+    if (data.length === 0) return null
+    return {
+      lat: parseFloat(data[0].lat),
+      lng: parseFloat(data[0].lon),
+      display: data[0].display_name,
+    }
+  } catch {
+    return null
+  }
+}
 
 export function LocationForm({
   location,
@@ -18,8 +36,8 @@ export function LocationForm({
   onDone?: () => void
 }) {
   const [name, setName] = useState(location?.name || '')
-  const [latitude, setLatitude] = useState(location?.latitude?.toString() || '')
-  const [longitude, setLongitude] = useState(location?.longitude?.toString() || '')
+  const [address, setAddress] = useState((location as any)?.address || '')
+  const [resolvedAddress, setResolvedAddress] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -29,32 +47,51 @@ export function LocationForm({
     e.preventDefault()
     setIsLoading(true)
     setError(null)
-
-    const lat = parseFloat(latitude)
-    const lng = parseFloat(longitude)
+    setResolvedAddress(null)
 
     if (!name.trim()) {
       setError('Naam is verplicht')
       setIsLoading(false)
       return
     }
-    if (isNaN(lat) || isNaN(lng)) {
-      setError('Ongeldige coördinaten')
+
+    if (!address.trim()) {
+      setError('Adres is verplicht')
       setIsLoading(false)
       return
     }
 
+    // Geocode the address
+    const geo = await geocodeAddress(address.trim())
+    if (!geo) {
+      setError('Adres niet gevonden. Probeer een specifieker adres.')
+      setIsLoading(false)
+      return
+    }
+
+    setResolvedAddress(geo.display)
+
     const result = isEditing
-      ? await updateLocation(location.id, { name: name.trim(), latitude: lat, longitude: lng })
-      : await createLocation({ name: name.trim(), latitude: lat, longitude: lng })
+      ? await updateLocation(location.id, {
+          name: name.trim(),
+          address: address.trim(),
+          latitude: geo.lat,
+          longitude: geo.lng,
+        })
+      : await createLocation({
+          name: name.trim(),
+          address: address.trim(),
+          latitude: geo.lat,
+          longitude: geo.lng,
+        })
 
     if (result.error) {
       setError(result.error)
     } else {
       if (!isEditing) {
         setName('')
-        setLatitude('')
-        setLongitude('')
+        setAddress('')
+        setResolvedAddress(null)
       }
       onDone?.()
     }
@@ -87,32 +124,22 @@ export function LocationForm({
               required
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="loc-lat">Breedtegraad</Label>
-              <Input
-                id="loc-lat"
-                type="number"
-                step="any"
-                value={latitude}
-                onChange={(e) => setLatitude(e.target.value)}
-                placeholder="52.3676"
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="loc-lng">Lengtegraad</Label>
-              <Input
-                id="loc-lng"
-                type="number"
-                step="any"
-                value={longitude}
-                onChange={(e) => setLongitude(e.target.value)}
-                placeholder="4.9041"
-                required
-              />
-            </div>
+          <div>
+            <Label htmlFor="loc-address">Adres</Label>
+            <Input
+              id="loc-address"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Bijv. Damrak 1, Amsterdam"
+              required
+            />
           </div>
+          {resolvedAddress && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <MapPin className="h-3 w-3" />
+              {resolvedAddress}
+            </p>
+          )}
           <Button type="submit" disabled={isLoading} className="w-full">
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isEditing ? 'Opslaan' : (

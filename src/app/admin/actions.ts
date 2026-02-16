@@ -113,6 +113,7 @@ export async function createLocation(data: CreateLocationInput) {
       .from('locations')
       .insert({
         name: data.name,
+        address: data.address || null,
         latitude: data.latitude,
         longitude: data.longitude,
         qr_code: qrCode,
