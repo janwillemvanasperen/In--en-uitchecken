@@ -13,31 +13,20 @@ export async function createUser(data: CreateUserInput) {
     await requireAdmin()
     const adminClient = createAdminClient()
 
-    // Create auth user
+    // Create auth user with metadata - the handle_new_user trigger
+    // automatically inserts into public.users using raw_user_meta_data
     const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
       email: data.email,
       password: data.password,
       email_confirm: true,
+      user_metadata: {
+        full_name: data.full_name,
+        role: data.role,
+      },
     })
 
     if (authError) {
       return { error: `Account aanmaken mislukt: ${authError.message}` }
-    }
-
-    // Insert into users table
-    const { error: insertError } = await adminClient
-      .from('users')
-      .insert({
-        id: authData.user.id,
-        email: data.email,
-        full_name: data.full_name,
-        role: data.role,
-      })
-
-    if (insertError) {
-      // Rollback: delete auth user
-      await adminClient.auth.admin.deleteUser(authData.user.id)
-      return { error: `Gebruiker opslaan mislukt: ${insertError.message}` }
     }
 
     revalidatePath('/admin/users')
