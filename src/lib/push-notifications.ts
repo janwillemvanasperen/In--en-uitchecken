@@ -55,7 +55,8 @@ export async function getExistingSubscription(): Promise<PushSubscription | null
   if (!('serviceWorker' in navigator)) return null
 
   try {
-    const registration = await navigator.serviceWorker.ready
+    const registration = await navigator.serviceWorker.getRegistration('/sw.js')
+    if (!registration) return null
     return await registration.pushManager.getSubscription()
   } catch {
     return null
