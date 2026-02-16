@@ -8,6 +8,8 @@ import Link from 'next/link'
 import { LogoutButton } from '@/components/logout-button'
 import { Users, MapPin, Calendar, Clock, FileText, Settings, ClipboardCheck } from 'lucide-react'
 
+export const dynamic = 'force-dynamic'
+
 export default async function AdminDashboard() {
   const user = await requireAdmin()
   const supabase = await createClient()
