@@ -15,26 +15,18 @@ export default async function LeaveRequestsPage() {
     .order('date', { ascending: false })
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold">Verlofaanvragen</h1>
+    <div className="max-w-4xl mx-auto">
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Form to create new leave request */}
+        <div>
+          <LeaveRequestForm />
         </div>
-      </header>
 
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Form to create new leave request */}
-          <div>
-            <LeaveRequestForm />
-          </div>
-
-          {/* List of existing leave requests */}
-          <div>
-            <LeaveRequestsList requests={leaveRequests || []} />
-          </div>
+        {/* List of existing leave requests */}
+        <div>
+          <LeaveRequestsList requests={leaveRequests || []} />
         </div>
-      </main>
+      </div>
     </div>
   )
 }

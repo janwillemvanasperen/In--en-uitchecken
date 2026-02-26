@@ -50,7 +50,7 @@ export function HistoryList({ checkIns }: HistoryListProps) {
             statusBadge = { variant: 'secondary', label: 'Actief' }
             const durationSeconds = Math.floor((Date.now() - checkInTime.getTime()) / 1000)
             durationText = formatDurationHoursMinutes(durationSeconds)
-            durationColor = 'text-blue-600'
+            durationColor = 'text-primary'
           }
         }
 

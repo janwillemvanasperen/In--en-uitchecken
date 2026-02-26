@@ -2,13 +2,9 @@
 import { requireStudent } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { LogoutButton } from '@/components/logout-button'
 import { ScheduleEditor } from '@/components/student/schedule-editor'
 import { ScheduleOverview } from '@/components/student/schedule-overview'
 import { ScheduleHistory } from '@/components/student/schedule-history'
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { ArrowLeft } from 'lucide-react'
 
 export default async function SchedulePage() {
   const user = await requireStudent()
@@ -81,51 +77,30 @@ export default async function SchedulePage() {
   const defaultTab = (!hasApproved && !hasPending) ? 'indienen' : 'overzicht'
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/student/dashboard">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
-            <h1 className="text-2xl font-bold">Rooster beheren</h1>
-          </div>
-          <div className="flex items-center gap-4">
-            <p className="text-sm text-muted-foreground">{user.full_name}</p>
-            <LogoutButton />
-          </div>
-        </div>
-      </header>
+    <Tabs defaultValue={defaultTab} className="space-y-6">
+      <TabsList>
+        <TabsTrigger value="overzicht">Overzicht</TabsTrigger>
+        <TabsTrigger value="indienen">
+          {hasPending ? 'Bewerken' : 'Indienen'}
+        </TabsTrigger>
+      </TabsList>
 
-      <main className="container mx-auto px-4 py-8">
-        <Tabs defaultValue={defaultTab} className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="overzicht">Overzicht</TabsTrigger>
-            <TabsTrigger value="indienen">
-              {hasPending ? 'Bewerken' : 'Indienen'}
-            </TabsTrigger>
-          </TabsList>
+      <TabsContent value="overzicht" className="space-y-6">
+        <ScheduleOverview
+          currentSchedule={currentSchedule}
+          pendingSchedule={pendingSchedule}
+        />
+        <ScheduleHistory history={history} />
+      </TabsContent>
 
-          <TabsContent value="overzicht" className="space-y-6">
-            <ScheduleOverview
-              currentSchedule={currentSchedule}
-              pendingSchedule={pendingSchedule}
-            />
-            <ScheduleHistory history={history} />
-          </TabsContent>
-
-          <TabsContent value="indienen">
-            <ScheduleEditor
-              defaultStartTime={defaultStartTime}
-              minimumHours={minimumHours}
-              periodWeeks={periodWeeks}
-              existingPending={pendingSchedule}
-            />
-          </TabsContent>
-        </Tabs>
-      </main>
-    </div>
+      <TabsContent value="indienen">
+        <ScheduleEditor
+          defaultStartTime={defaultStartTime}
+          minimumHours={minimumHours}
+          periodWeeks={periodWeeks}
+          existingPending={pendingSchedule}
+        />
+      </TabsContent>
+    </Tabs>
   )
 }

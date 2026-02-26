@@ -341,9 +341,9 @@ export function StudentDetailView({
                     return (
                       <div
                         key={day}
-                        className={`flex items-center justify-between p-3 rounded-lg ${isCurrentDay ? 'bg-blue-50 border border-blue-200' : 'bg-muted/30'}`}
+                        className={`flex items-center justify-between p-3 rounded-lg ${isCurrentDay ? 'bg-primary/10 border border-primary/30' : 'bg-muted/30'}`}
                       >
-                        <span className={`text-sm font-medium ${isCurrentDay ? 'text-blue-700' : ''}`}>
+                        <span className={`text-sm font-medium ${isCurrentDay ? 'text-primary' : ''}`}>
                           {DAY_NAMES[day]}
                           {isCurrentDay && ' (vandaag)'}
                         </span>
@@ -474,9 +474,9 @@ export function StudentDetailView({
                   return (
                     <div
                       key={day}
-                      className={`flex items-center justify-between p-2 rounded ${isCurrent ? 'bg-blue-50 border border-blue-200' : ''}`}
+                      className={`flex items-center justify-between p-2 rounded ${isCurrent ? 'bg-primary/10 border border-primary/30' : ''}`}
                     >
-                      <span className={`text-sm ${isCurrent ? 'font-medium text-blue-700' : isFuture ? 'text-muted-foreground' : ''}`}>
+                      <span className={`text-sm ${isCurrent ? 'font-medium text-primary' : isFuture ? 'text-muted-foreground' : ''}`}>
                         {DAY_NAMES[day]}
                       </span>
                       <div className="flex items-center gap-3 text-sm">

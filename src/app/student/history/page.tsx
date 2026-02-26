@@ -35,20 +35,12 @@ export default async function HistoryPage({
     .order('check_in_time', { ascending: false })
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold">Geschiedenis</h1>
-        </div>
-      </header>
+    <div className="max-w-4xl mx-auto">
+      <HistoryFilterTabs currentFilter={filter} />
 
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
-        <HistoryFilterTabs currentFilter={filter} />
-
-        <div className="mt-6">
-          <HistoryList checkIns={checkIns || []} />
-        </div>
-      </main>
+      <div className="mt-6">
+        <HistoryList checkIns={checkIns || []} />
+      </div>
     </div>
   )
 }

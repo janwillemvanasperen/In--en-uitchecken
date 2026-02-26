@@ -5,6 +5,7 @@ import { StudentDetailView } from '@/components/admin/student-detail-view'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
+import { AvatarWithFallback } from '@/components/shared/avatar-with-fallback'
 import { getMonday } from '@/lib/date-utils'
 import { notFound } from 'next/navigation'
 
@@ -24,7 +25,7 @@ export default async function StudentDetailPage({ params }: { params: { studentI
   // Get student profile
   const { data: student } = await supabase
     .from('users')
-    .select('id, full_name, email, coach_id, created_at, coaches!users_coach_id_fkey(name)')
+    .select('id, full_name, email, coach_id, profile_photo_url, created_at, coaches!users_coach_id_fkey(name)')
     .eq('id', studentId)
     .eq('role', 'student')
     .single()
@@ -117,6 +118,11 @@ export default async function StudentDetailPage({ params }: { params: { studentI
               Terug
             </Button>
           </Link>
+          <AvatarWithFallback
+            src={student.profile_photo_url}
+            fullName={student.full_name}
+            size="md"
+          />
           <div>
             <h1 className="text-2xl font-bold">{student.full_name}</h1>
             <p className="text-sm text-muted-foreground">

@@ -1,44 +1,23 @@
 // @ts-nocheck
 import { requireStudent } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
-import { LogoutButton } from '@/components/logout-button'
-import { TodayScheduleCard } from '@/components/student/today-schedule-card'
 import { CurrentStatusCard } from '@/components/student/current-status-card'
 import { WeeklyProgressCard } from '@/components/student/weekly-progress-card'
-import { NextSessionCard } from '@/components/student/next-session-card'
+import { WeekScheduleCard } from '@/components/student/week-schedule-card'
+import { LeaveSummaryCard } from '@/components/student/leave-summary-card'
 import { PushNotificationToggle } from '@/components/student/push-notification-toggle'
 import { getMonday } from '@/lib/date-utils'
+import { Clock, History, Calendar, FileText } from 'lucide-react'
 
 export default async function StudentDashboard() {
   const user = await requireStudent()
   const supabase = await createClient()
 
-  // Get coach name if assigned
-  const { data: userProfile } = await supabase
-    .from('users')
-    .select('coach_id, coaches!users_coach_id_fkey(name)')
-    .eq('id', user.id)
-    .single()
-
-  const coachName = (userProfile as any)?.coaches?.name || null
-
-  // Get today's day of week (1 = Monday, 7 = Sunday)
   const today = new Date()
   const dayOfWeek = today.getDay() || 7
-
-  // Get today's schedule
-  const { data: todaySchedule } = await supabase
-    .from('schedules')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('day_of_week', dayOfWeek)
-    .eq('status', 'approved')
-    .lte('valid_from', today.toISOString().split('T')[0])
-    .gte('valid_until', today.toISOString().split('T')[0])
-    .single()
+  const todayStr = today.toISOString().split('T')[0]
 
   // Get active check-in
   const { data: activeCheckIn } = await supabase
@@ -48,7 +27,7 @@ export default async function StudentDashboard() {
     .is('check_out_time', null)
     .single()
 
-  // Get weekly hours (current week starting Monday)
+  // Get weekly hours
   const monday = getMonday(today)
   const { data: weeklyHours } = await supabase
     .rpc('get_weekly_hours', {
@@ -56,18 +35,25 @@ export default async function StudentDashboard() {
       week_start: monday.toISOString().split('T')[0],
     })
 
-  // Get next scheduled session (after today)
-  const { data: nextSession } = await supabase
+  // Get full week schedule (approved, current period)
+  const { data: weekSchedules } = await supabase
     .from('schedules')
-    .select('*')
+    .select('day_of_week, start_time, end_time')
     .eq('user_id', user.id)
     .eq('status', 'approved')
-    .gt('day_of_week', dayOfWeek)
-    .lte('valid_from', today.toISOString().split('T')[0])
-    .gte('valid_until', today.toISOString().split('T')[0])
+    .lte('valid_from', todayStr)
+    .gte('valid_until', todayStr)
     .order('day_of_week', { ascending: true })
-    .limit(1)
-    .single()
+
+  // Get leave request counts
+  const { data: leaveRequests } = await supabase
+    .from('leave_requests')
+    .select('status')
+    .eq('user_id', user.id)
+
+  const pendingLeave = (leaveRequests || []).filter(lr => lr.status === 'pending').length
+  const approvedLeave = (leaveRequests || []).filter(lr => lr.status === 'approved').length
+  const rejectedLeave = (leaveRequests || []).filter(lr => lr.status === 'rejected').length
 
   // Get recent check-ins
   const { data: checkIns } = await supabase
@@ -77,124 +63,132 @@ export default async function StudentDashboard() {
     .order('check_in_time', { ascending: false })
     .limit(5)
 
+  // Find today's schedule from weekSchedules
+  const todaySchedule = (weekSchedules || []).find((s: any) => s.day_of_week === dayOfWeek) || null
+
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Student Dashboard</h1>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-sm text-muted-foreground">{user.full_name}</p>
-              {coachName && (
-                <p className="text-xs text-muted-foreground">Coach: {coachName}</p>
-              )}
-            </div>
-            <LogoutButton />
-          </div>
-        </div>
-      </header>
+    <>
+      {/* Hero: Status + Check-in button (full width) */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-6">
+        <CurrentStatusCard
+          initialCheckIn={activeCheckIn}
+          userId={user.id}
+        />
+      </div>
 
-      <main className="container mx-auto px-4 py-8">
-        {/* Hero: Status + Check-in button */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-6">
-          <CurrentStatusCard
-            initialCheckIn={activeCheckIn}
-            userId={user.id}
-          />
-        </div>
+      {/* Info row: Weekly Progress + Week Schedule + Leave Summary */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-6">
+        <WeeklyProgressCard weeklyHours={weeklyHours || 0} />
+        <WeekScheduleCard schedules={weekSchedules || []} />
+        <LeaveSummaryCard
+          pendingCount={pendingLeave}
+          approvedCount={approvedLeave}
+          rejectedCount={rejectedLeave}
+        />
+      </div>
 
-        {/* Info row: Schedule, Progress, Next session */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-6">
-          <TodayScheduleCard schedule={todaySchedule} />
-
-          <WeeklyProgressCard weeklyHours={weeklyHours || 0} />
-
-          <NextSessionCard
-            nextSession={nextSession}
-            isCheckedIn={!!activeCheckIn}
-          />
-        </div>
-
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Recente check-ins</CardTitle>
-            <CardDescription>
-              Je laatste 5 check-in sessies
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {checkIns && checkIns.length > 0 ? (
-              <div className="space-y-4">
-                {checkIns.map((checkIn: any) => (
-                  <div key={checkIn.id} className="flex items-center justify-between border-b pb-2">
-                    <div>
-                      <p className="font-medium">{checkIn.locations?.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(checkIn.check_in_time).toLocaleString('nl-NL')}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      {checkIn.check_out_time ? (
-                        <span className="text-green-600">Uitgecheckt</span>
-                      ) : (
-                        <span className="text-blue-600">Actief</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
+      {/* Today's schedule info */}
+      {todaySchedule && (
+        <Card className="mb-6 border-primary/20">
+          <CardContent className="py-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <Clock className="h-5 w-5 text-primary" />
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">Nog geen check-ins</p>
-            )}
+              <div>
+                <p className="text-sm text-muted-foreground">Rooster vandaag</p>
+                <p className="font-medium">
+                  {todaySchedule.start_time.slice(0, 5)} - {todaySchedule.end_time.slice(0, 5)}
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
+      )}
 
-        <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Geschiedenis</CardTitle>
-              <CardDescription>Bekijk al je check-ins</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link href="/student/history">
-                <Button variant="outline" className="w-full">
-                  Bekijk geschiedenis
-                </Button>
-              </Link>
+      {/* Recent check-ins */}
+      <Card className="mb-6">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Recente check-ins</CardTitle>
+            <Link href="/student/history" className="text-xs text-primary hover:underline">
+              Alles bekijken
+            </Link>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {checkIns && checkIns.length > 0 ? (
+            <div className="space-y-3">
+              {checkIns.map((checkIn: any) => (
+                <div key={checkIn.id} className="flex items-center justify-between border-b pb-2 last:border-0">
+                  <div>
+                    <p className="font-medium text-sm">{checkIn.locations?.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(checkIn.check_in_time).toLocaleString('nl-NL')}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    {checkIn.check_out_time ? (
+                      <span className="text-xs text-green-600">Uitgecheckt</span>
+                    ) : (
+                      <span className="text-xs text-primary font-medium">Actief</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Nog geen check-ins</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Quick links */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Link href="/student/history">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer">
+            <CardContent className="py-4 flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                <History className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="font-medium text-sm">Geschiedenis</p>
+                <p className="text-xs text-muted-foreground">Alle check-ins</p>
+              </div>
             </CardContent>
           </Card>
+        </Link>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Rooster beheren</CardTitle>
-              <CardDescription>Bekijk en bewerk je weekrooster</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link href="/student/schedule">
-                <Button variant="outline" className="w-full">
-                  Beheer rooster
-                </Button>
-              </Link>
+        <Link href="/student/schedule">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer">
+            <CardContent className="py-4 flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                <Calendar className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="font-medium text-sm">Rooster</p>
+                <p className="text-xs text-muted-foreground">Beheer weekrooster</p>
+              </div>
             </CardContent>
           </Card>
+        </Link>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Verlofaanvragen</CardTitle>
-              <CardDescription>Vraag verlof aan voor ziekte, te laat of afspraak</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link href="/student/leave-requests">
-                <Button variant="outline" className="w-full">
-                  Beheer verlof
-                </Button>
-              </Link>
+        <Link href="/student/leave-requests">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer">
+            <CardContent className="py-4 flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                <FileText className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="font-medium text-sm">Verlof</p>
+                <p className="text-xs text-muted-foreground">Aanvragen beheren</p>
+              </div>
             </CardContent>
           </Card>
+        </Link>
 
-          <PushNotificationToggle />
-        </div>
-      </main>
-    </div>
+        <PushNotificationToggle />
+      </div>
+    </>
   )
 }

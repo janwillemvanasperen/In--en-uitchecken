@@ -16,6 +16,7 @@ export type Database = {
           role: 'student' | 'admin'
           full_name: string
           coach_id: string | null
+          profile_photo_url: string | null
           created_at: string
           updated_at: string
         }
@@ -25,6 +26,7 @@ export type Database = {
           role?: 'student' | 'admin'
           full_name: string
           coach_id?: string | null
+          profile_photo_url?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -34,6 +36,7 @@ export type Database = {
           role?: 'student' | 'admin'
           full_name?: string
           coach_id?: string | null
+          profile_photo_url?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -295,6 +298,38 @@ export type Database = {
           value?: string
           created_at?: string
           updated_at?: string
+        }
+      }
+      notifications: {
+        Row: {
+          id: string
+          user_id: string
+          type: string
+          title: string
+          message: string
+          read: boolean
+          related_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          type: string
+          title: string
+          message: string
+          read?: boolean
+          related_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          type?: string
+          title?: string
+          message?: string
+          read?: boolean
+          related_id?: string | null
+          created_at?: string
         }
       }
     }

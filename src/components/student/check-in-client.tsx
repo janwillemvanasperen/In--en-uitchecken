@@ -320,12 +320,12 @@ export function CheckInClient({ locations, activeCheckIn, todaySchedule, userId 
           </Tabs>
 
           {todaySchedule && (
-            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="mt-4 p-3 bg-primary/10 rounded-lg border border-primary/30">
               <div className="flex items-start gap-2">
-                <Clock className="h-4 w-4 text-blue-600 mt-0.5" />
+                <Clock className="h-4 w-4 text-primary mt-0.5" />
                 <div className="text-sm">
-                  <p className="font-medium text-blue-900">Rooster vandaag</p>
-                  <p className="text-blue-700">
+                  <p className="font-medium text-foreground">Rooster vandaag</p>
+                  <p className="text-primary">
                     {todaySchedule.start_time.slice(0, 5)} - {todaySchedule.end_time.slice(0, 5)}
                   </p>
                 </div>

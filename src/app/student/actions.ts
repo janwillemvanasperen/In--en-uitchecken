@@ -448,6 +448,113 @@ export async function savePushSubscription(data: PushSubscriptionInput) {
   }
 }
 
+export async function markNotificationRead(notificationId: string) {
+  try {
+    const user = await requireStudent()
+    const supabase = await createClient()
+
+    // @ts-ignore
+    const { error } = await supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('id', notificationId)
+      .eq('user_id', user.id)
+
+    if (error) {
+      return { error: 'Melding markeren mislukt' }
+    }
+
+    revalidatePath('/student')
+    return { success: true }
+  } catch (error) {
+    return { error: 'Er is een onverwachte fout opgetreden' }
+  }
+}
+
+export async function markAllNotificationsRead() {
+  try {
+    const user = await requireStudent()
+    const supabase = await createClient()
+
+    // @ts-ignore
+    const { error } = await supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('user_id', user.id)
+      .eq('read', false)
+
+    if (error) {
+      return { error: 'Meldingen markeren mislukt' }
+    }
+
+    revalidatePath('/student')
+    return { success: true }
+  } catch (error) {
+    return { error: 'Er is een onverwachte fout opgetreden' }
+  }
+}
+
+export async function uploadProfilePhoto(formData: FormData) {
+  try {
+    const user = await requireStudent()
+    const supabase = await createClient()
+
+    const file = formData.get('photo') as File
+    if (!file || file.size === 0) {
+      return { error: 'Geen bestand geselecteerd' }
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      return { error: 'Alleen afbeeldingen zijn toegestaan' }
+    }
+
+    // Max 2MB
+    if (file.size > 2 * 1024 * 1024) {
+      return { error: 'Bestand is te groot (max 2MB)' }
+    }
+
+    const fileExt = file.name.split('.').pop() || 'jpg'
+    const filePath = `${user.id}/profile.${fileExt}`
+
+    // Upload to Supabase Storage
+    const { error: uploadError } = await supabase.storage
+      .from('profile-photos')
+      .upload(filePath, file, {
+        upsert: true,
+        contentType: file.type,
+      })
+
+    if (uploadError) {
+      console.error('Upload error:', uploadError)
+      return { error: 'Upload mislukt. Probeer het opnieuw.' }
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('profile-photos')
+      .getPublicUrl(filePath)
+
+    // Update user profile
+    // @ts-ignore
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ profile_photo_url: urlData.publicUrl })
+      .eq('id', user.id)
+
+    if (updateError) {
+      console.error('Profile update error:', updateError)
+      return { error: 'Profiel bijwerken mislukt' }
+    }
+
+    revalidatePath('/student')
+    return { success: true, url: urlData.publicUrl }
+  } catch (error) {
+    console.error('Upload error:', error)
+    return { error: 'Er is een onverwachte fout opgetreden' }
+  }
+}
+
 export async function deletePushSubscription(endpoint: string) {
   try {
     const user = await requireStudent()

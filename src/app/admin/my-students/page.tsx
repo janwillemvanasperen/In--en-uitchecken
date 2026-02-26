@@ -30,7 +30,7 @@ export default async function MyStudentsPage() {
     // All students with coach info
     supabase
       .from('users')
-      .select('id, full_name, email, coach_id, coaches!users_coach_id_fkey(name)')
+      .select('id, full_name, email, coach_id, profile_photo_url, coaches!users_coach_id_fkey(name)')
       .eq('role', 'student')
       .order('full_name'),
     // Active coaches

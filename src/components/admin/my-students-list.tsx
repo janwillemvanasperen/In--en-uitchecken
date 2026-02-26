@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import Link from 'next/link'
 import { Search, Clock, MapPin, AlertTriangle, CheckCircle } from 'lucide-react'
+import { AvatarWithFallback } from '@/components/shared/avatar-with-fallback'
 import type { Coach } from '@/types'
 
 interface StudentRow {
@@ -14,6 +15,7 @@ interface StudentRow {
   full_name: string
   email: string
   coach_id: string | null
+  profile_photo_url: string | null
   coaches: { name: string } | null
 }
 
@@ -73,11 +75,11 @@ export function MyStudentsList({
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                <Clock className="h-5 w-5 text-blue-600" />
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <Clock className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-blue-600">{scheduledToday}</p>
+                <p className="text-2xl font-bold text-primary">{scheduledToday}</p>
                 <p className="text-sm text-muted-foreground">Ingepland vandaag</p>
               </div>
             </div>
@@ -148,11 +150,18 @@ export function MyStudentsList({
               <Card className={`hover:shadow-md transition-shadow cursor-pointer ${isActive ? 'border-green-300 bg-green-50/30' : ''}`}>
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="text-base">{student.full_name}</CardTitle>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {student.coaches?.name || 'Geen coach'}
-                      </p>
+                    <div className="flex items-center gap-3">
+                      <AvatarWithFallback
+                        src={student.profile_photo_url}
+                        fullName={student.full_name}
+                        size="sm"
+                      />
+                      <div>
+                        <CardTitle className="text-base">{student.full_name}</CardTitle>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {student.coaches?.name || 'Geen coach'}
+                        </p>
+                      </div>
                     </div>
                     <div className="flex gap-1">
                       {isActive && (

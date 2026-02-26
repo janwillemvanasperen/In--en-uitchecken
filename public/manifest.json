@@ -1,9 +1,9 @@
 {
-  "name": "Aanwezigheidsregistratie",
-  "short_name": "Check-in",
+  "name": "Scratch",
+  "short_name": "Scratch",
   "description": "Check in/uit systeem voor studenten",
   "start_url": "/student/dashboard",
   "display": "standalone",
-  "theme_color": "#3b82f6",
+  "theme_color": "#ffd100",
   "background_color": "#ffffff"
 }

@@ -18,6 +18,10 @@ export type ActiveCheckIn = CheckIn & {
   locations: Location
 }
 
+// Notification types
+export type Notification = Database['public']['Tables']['notifications']['Row']
+export type NotificationType = 'check_in' | 'check_out' | 'leave_approved' | 'leave_rejected' | 'schedule_approved' | 'schedule_rejected' | 'system'
+
 // Enum types
 export type UserRole = 'student' | 'admin'
 export type ScheduleStatus = 'pending' | 'approved' | 'rejected'
