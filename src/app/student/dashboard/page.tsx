@@ -5,18 +5,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { CurrentStatusCard } from '@/components/student/current-status-card'
-import { WeeklyProgressCard } from '@/components/student/weekly-progress-card'
+import { ProgressAndLeaveCard } from '@/components/student/progress-and-leave-card'
 import { WeekScheduleCard } from '@/components/student/week-schedule-card'
-import { LeaveSummaryCard } from '@/components/student/leave-summary-card'
 import { getMonday } from '@/lib/date-utils'
-import { Clock, History } from 'lucide-react'
+import { History } from 'lucide-react'
 
 export default async function StudentDashboard() {
   const user = await requireStudent()
   const supabase = await createClient()
 
   const today = new Date()
-  const dayOfWeek = today.getDay() || 7
   const todayStr = today.toISOString().split('T')[0]
 
   // Get active check-in
@@ -71,9 +69,6 @@ export default async function StudentDashboard() {
     .order('check_in_time', { ascending: false })
     .limit(5)
 
-  // Find today's schedule from weekSchedules
-  const todaySchedule = (weekSchedules || []).find((s: any) => s.day_of_week === dayOfWeek) || null
-
   return (
     <>
       {/* Hero: Status + Check-in button (full width) */}
@@ -84,38 +79,17 @@ export default async function StudentDashboard() {
         />
       </div>
 
-      {/* Info row: Weekly Progress + Week Schedule + Leave Summary */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-6">
-        <WeeklyProgressCard
+      {/* Info row: Progress & Leave + Week Schedule */}
+      <div className="grid gap-6 md:grid-cols-2 mb-6">
+        <ProgressAndLeaveCard
           weeklyHours={weeklyHours || 0}
-          targetHours={scheduledWeeklyHours > 0 ? scheduledWeeklyHours : undefined}
-        />
-        <WeekScheduleCard schedules={weekSchedules || []} />
-        <LeaveSummaryCard
+          targetHours={scheduledWeeklyHours > 0 ? scheduledWeeklyHours : 16}
           pendingCount={pendingLeave}
           approvedCount={approvedLeave}
           rejectedCount={rejectedLeave}
         />
+        <WeekScheduleCard schedules={weekSchedules || []} />
       </div>
-
-      {/* Today's schedule info */}
-      {todaySchedule && (
-        <Card className="mb-6 border-primary/20">
-          <CardContent className="py-4">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <Clock className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Rooster vandaag</p>
-                <p className="font-medium">
-                  {todaySchedule.start_time.slice(0, 5)} - {todaySchedule.end_time.slice(0, 5)}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Recent check-ins */}
       <Card className="mb-6">
