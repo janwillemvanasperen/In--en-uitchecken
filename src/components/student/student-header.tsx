@@ -27,11 +27,8 @@ export function StudentHeader({ user, notifications, unreadCount }: StudentHeade
     <header className="sticky top-0 z-50 bg-background border-b shadow-sm">
       <div className="container mx-auto px-4 h-14 flex items-center justify-between">
         {/* Left: Logo */}
-        <Link href="/student/dashboard" className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">S</span>
-          </div>
-          <span className="font-bold text-lg hidden sm:inline">Scratch</span>
+        <Link href="/student/dashboard">
+          <img src="/logo.png" alt="Scratch MBO Utrecht" className="h-8" />
         </Link>
 
         {/* Right: Notifications + Avatar + Name + Logout */}

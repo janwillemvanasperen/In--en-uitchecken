@@ -44,7 +44,7 @@ export function WeekScheduleCard({ schedules }: WeekScheduleCardProps) {
                   {DAY_NAMES[day]}
                 </span>
                 {s ? (
-                  <span className="font-mono text-xs">
+                  <span className="text-sm">
                     {s.start_time.slice(0, 5)} - {s.end_time.slice(0, 5)}
                   </span>
                 ) : (
