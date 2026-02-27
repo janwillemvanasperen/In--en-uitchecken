@@ -2,14 +2,14 @@
 import { requireStudent } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { CurrentStatusCard } from '@/components/student/current-status-card'
 import { WeeklyProgressCard } from '@/components/student/weekly-progress-card'
 import { WeekScheduleCard } from '@/components/student/week-schedule-card'
 import { LeaveSummaryCard } from '@/components/student/leave-summary-card'
-import { PushNotificationToggle } from '@/components/student/push-notification-toggle'
 import { getMonday } from '@/lib/date-utils'
-import { Clock, History, Calendar, FileText } from 'lucide-react'
+import { Clock, History } from 'lucide-react'
 
 export default async function StudentDashboard() {
   const user = await requireStudent()
@@ -45,6 +45,14 @@ export default async function StudentDashboard() {
     .gte('valid_until', todayStr)
     .order('day_of_week', { ascending: true })
 
+  // Calculate scheduled weekly hours from roster
+  let scheduledWeeklyHours = 0
+  for (const s of weekSchedules || []) {
+    const start = s.start_time.split(':').map(Number)
+    const end = s.end_time.split(':').map(Number)
+    scheduledWeeklyHours += (end[0] + end[1] / 60) - (start[0] + start[1] / 60)
+  }
+
   // Get leave request counts
   const { data: leaveRequests } = await supabase
     .from('leave_requests')
@@ -78,7 +86,10 @@ export default async function StudentDashboard() {
 
       {/* Info row: Weekly Progress + Week Schedule + Leave Summary */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-6">
-        <WeeklyProgressCard weeklyHours={weeklyHours || 0} />
+        <WeeklyProgressCard
+          weeklyHours={weeklyHours || 0}
+          targetHours={scheduledWeeklyHours > 0 ? scheduledWeeklyHours : undefined}
+        />
         <WeekScheduleCard schedules={weekSchedules || []} />
         <LeaveSummaryCard
           pendingCount={pendingLeave}
@@ -140,55 +151,16 @@ export default async function StudentDashboard() {
           ) : (
             <p className="text-sm text-muted-foreground">Nog geen check-ins</p>
           )}
+          <div className="mt-4 pt-3 border-t">
+            <Link href="/student/history">
+              <Button variant="outline" size="sm" className="w-full">
+                <History className="h-4 w-4 mr-2" />
+                Bekijk volledige geschiedenis
+              </Button>
+            </Link>
+          </div>
         </CardContent>
       </Card>
-
-      {/* Quick links */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Link href="/student/history">
-          <Card className="hover:shadow-md transition-shadow cursor-pointer">
-            <CardContent className="py-4 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-                <History className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="font-medium text-sm">Geschiedenis</p>
-                <p className="text-xs text-muted-foreground">Alle check-ins</p>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link href="/student/schedule">
-          <Card className="hover:shadow-md transition-shadow cursor-pointer">
-            <CardContent className="py-4 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-                <Calendar className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="font-medium text-sm">Rooster</p>
-                <p className="text-xs text-muted-foreground">Beheer weekrooster</p>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link href="/student/leave-requests">
-          <Card className="hover:shadow-md transition-shadow cursor-pointer">
-            <CardContent className="py-4 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-                <FileText className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="font-medium text-sm">Verlof</p>
-                <p className="text-xs text-muted-foreground">Aanvragen beheren</p>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <PushNotificationToggle />
-      </div>
     </>
   )
 }

@@ -1,5 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { Calendar } from 'lucide-react'
+import Link from 'next/link'
 
 const DAY_NAMES = ['', 'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 
@@ -51,6 +53,13 @@ export function WeekScheduleCard({ schedules }: WeekScheduleCardProps) {
               </div>
             )
           })}
+        </div>
+        <div className="mt-3 pt-3 border-t">
+          <Link href="/student/schedule">
+            <Button variant="outline" size="sm" className="w-full">
+              Beheer rooster
+            </Button>
+          </Link>
         </div>
       </CardContent>
     </Card>

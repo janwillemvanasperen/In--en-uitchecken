@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Bell, Check, CheckCheck } from 'lucide-react'
+import { Bell, BellOff, Check, CheckCheck, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Popover,
@@ -10,6 +10,14 @@ import {
 } from '@/components/ui/popover'
 import { createClient } from '@/lib/supabase/client'
 import { markNotificationRead, markAllNotificationsRead } from '@/app/student/actions'
+import {
+  isPushSupported,
+  registerServiceWorker,
+  subscribeToPush,
+  getExistingSubscription,
+  unsubscribeFromPush,
+} from '@/lib/push-notifications'
+import { savePushSubscription, deletePushSubscription } from '@/app/student/actions'
 
 interface Notification {
   id: string
@@ -35,6 +43,26 @@ export function NotificationsDropdown({
   const [unreadCount, setUnreadCount] = useState(initialUnreadCount)
   const [open, setOpen] = useState(false)
   const supabase = createClient()
+
+  // Push notification state
+  const [pushSupported, setPushSupported] = useState(false)
+  const [pushSubscribed, setPushSubscribed] = useState(false)
+  const [pushLoading, setPushLoading] = useState(true)
+  const [pushToggling, setPushToggling] = useState(false)
+
+  // Check push notification status
+  useEffect(() => {
+    const checkPush = async () => {
+      const supported = isPushSupported()
+      setPushSupported(supported)
+      if (supported) {
+        const sub = await getExistingSubscription()
+        setPushSubscribed(!!sub)
+      }
+      setPushLoading(false)
+    }
+    checkPush()
+  }, [])
 
   // Real-time subscription for new notifications
   useEffect(() => {
@@ -73,6 +101,29 @@ export function NotificationsDropdown({
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
     setUnreadCount(0)
     await markAllNotificationsRead()
+  }
+
+  async function handleEnablePush() {
+    setPushToggling(true)
+    try {
+      const registration = await registerServiceWorker()
+      if (!registration) { setPushToggling(false); return }
+      const subscription = await subscribeToPush(registration)
+      if (!subscription) { setPushToggling(false); return }
+      const result = await savePushSubscription(subscription)
+      if (!result.error) setPushSubscribed(true)
+    } catch {}
+    setPushToggling(false)
+  }
+
+  async function handleDisablePush() {
+    setPushToggling(true)
+    try {
+      const endpoint = await unsubscribeFromPush()
+      if (endpoint) await deletePushSubscription(endpoint)
+      setPushSubscribed(false)
+    } catch {}
+    setPushToggling(false)
   }
 
   function formatTime(dateStr: string) {
@@ -117,7 +168,7 @@ export function NotificationsDropdown({
             </Button>
           )}
         </div>
-        <div className="max-h-80 overflow-y-auto">
+        <div className="max-h-64 overflow-y-auto">
           {notifications.length === 0 ? (
             <div className="py-8 text-center text-sm text-muted-foreground">
               Geen meldingen
@@ -157,6 +208,39 @@ export function NotificationsDropdown({
             ))
           )}
         </div>
+
+        {/* Push notification toggle */}
+        {pushSupported && !pushLoading && (
+          <div className="px-4 py-3 border-t bg-muted/30">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm">
+                {pushSubscribed ? (
+                  <Bell className="h-3.5 w-3.5 text-green-600" />
+                ) : (
+                  <BellOff className="h-3.5 w-3.5 text-muted-foreground" />
+                )}
+                <span className="text-muted-foreground">
+                  Push meldingen
+                </span>
+              </div>
+              <Button
+                variant={pushSubscribed ? 'outline' : 'default'}
+                size="sm"
+                className="h-7 text-xs"
+                onClick={pushSubscribed ? handleDisablePush : handleEnablePush}
+                disabled={pushToggling}
+              >
+                {pushToggling ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : pushSubscribed ? (
+                  'Uitschakelen'
+                ) : (
+                  'Inschakelen'
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   )

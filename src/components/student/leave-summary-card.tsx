@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { FileText } from 'lucide-react'
 import Link from 'next/link'
 
@@ -51,9 +52,13 @@ export function LeaveSummaryCard({ pendingCount, approvedCount, rejectedCount }:
             )}
           </div>
         )}
-        <Link href="/student/leave-requests" className="text-xs text-primary hover:underline mt-3 block">
-          Bekijk alle verlofaanvragen
-        </Link>
+        <div className="mt-3 pt-3 border-t">
+          <Link href="/student/leave-requests">
+            <Button variant="outline" size="sm" className="w-full">
+              Verlof aanvragen
+            </Button>
+          </Link>
+        </div>
       </CardContent>
     </Card>
   )
