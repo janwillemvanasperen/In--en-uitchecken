@@ -9,8 +9,7 @@ import { createClient } from '@/lib/supabase/client'
 import { formatDuration } from '@/lib/date-utils'
 import { getUserLocation, isWithinRadius } from '@/lib/geolocation'
 import { checkIn, checkOut } from '@/app/student/actions'
-import { Clock, MapPin, LogIn, LogOut, History, Loader2 } from 'lucide-react'
-import Link from 'next/link'
+import { Clock, MapPin, LogIn, LogOut, Loader2 } from 'lucide-react'
 import type { ActiveCheckIn, Location } from '@/types'
 
 interface CheckInHistoryCardProps {
@@ -160,16 +159,6 @@ export function CheckInHistoryCard({
             </Button>
           </div>
         )}
-
-        {/* History button */}
-        <div className="mt-auto border-t pt-3">
-          <Link href="/student/history">
-            <Button variant="outline" size="sm" className="w-full">
-              <History className="h-4 w-4 mr-2" />
-              Volledige geschiedenis
-            </Button>
-          </Link>
-        </div>
 
       </CardContent>
     </Card>

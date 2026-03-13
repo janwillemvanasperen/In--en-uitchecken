@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Calendar } from 'lucide-react'
+import { Calendar, History } from 'lucide-react'
 import Link from 'next/link'
 import { DayRow } from '@/components/student/week-history-view'
 import type { DayData } from '@/components/student/week-history-view'
@@ -25,9 +25,10 @@ export function WeekScheduleCard({ days }: WeekScheduleCardProps) {
           ))}
         </div>
         <div className="mt-auto pt-3 border-t">
-          <Link href="/student/schedule">
+          <Link href="/student/history">
             <Button variant="outline" size="sm" className="w-full">
-              Beheer rooster
+              <History className="h-4 w-4 mr-2" />
+              Volledige geschiedenis
             </Button>
           </Link>
         </div>
