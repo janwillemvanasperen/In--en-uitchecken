@@ -42,14 +42,14 @@ export function StudentHeader({ user, notifications, unreadCount }: StudentHeade
             initialNotifications={notifications}
             initialUnreadCount={unreadCount}
           />
-          <div className="hidden sm:block text-right">
-            <p className="text-sm font-medium leading-tight">{user.full_name}</p>
-          </div>
-          <AvatarWithFallback
-            src={user.profile_photo_url}
-            fullName={user.full_name}
-            size="sm"
-          />
+          <Link href="/student/profile" className="flex items-center gap-2">
+            <span className="hidden sm:block text-sm font-medium leading-tight">{user.full_name}</span>
+            <AvatarWithFallback
+              src={user.profile_photo_url}
+              fullName={user.full_name}
+              size="sm"
+            />
+          </Link>
           <LogoutButton />
         </div>
       </div>
