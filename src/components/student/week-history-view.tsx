@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 const DAY_SHORT = ['', 'Ma', 'Di', 'Wo', 'Do', 'Vr']
@@ -17,6 +18,7 @@ export interface DayData {
   dayOfWeek: number
   scheduled: { start_time: string; end_time: string } | null
   checkIns: CheckInEntry[]
+  approvedLeave: { hours_counted: number } | null
 }
 
 interface WeekHistoryViewProps {
@@ -51,15 +53,26 @@ export function WeekHistoryView({ weekOffset, mondayIso, days }: WeekHistoryView
   let totalScheduledMins = 0
 
   for (const day of days) {
+    const scheduledMins = day.scheduled
+      ? timeToMins(day.scheduled.end_time) - timeToMins(day.scheduled.start_time)
+      : 0
+
     if (day.scheduled) {
-      totalScheduledMins += timeToMins(day.scheduled.end_time) - timeToMins(day.scheduled.start_time)
+      totalScheduledMins += scheduledMins
     }
+
+    // Actual check-ins
     for (const ci of day.checkIns) {
       if (ci.check_out_time) {
         totalPresentMins += Math.floor(
           (new Date(ci.check_out_time).getTime() - new Date(ci.check_in_time).getTime()) / 60000
         )
       }
+    }
+
+    // Approved leave (without check-in) counts as fully present for the scheduled hours
+    if (day.approvedLeave && day.checkIns.length === 0 && scheduledMins > 0) {
+      totalPresentMins += scheduledMins
     }
   }
 
@@ -119,13 +132,13 @@ export function WeekHistoryView({ weekOffset, mondayIso, days }: WeekHistoryView
 }
 
 function DayRow({ day }: { day: DayData }) {
-  // Use noon local time to avoid DST issues
   const date = new Date(day.isoDate + 'T12:00:00')
   const dateLabel = date.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
   const hasSchedule = !!day.scheduled
   const hasCheckIn = day.checkIns.length > 0
+  const hasLeave = !!day.approvedLeave
 
-  // Aggregate check-ins: sum durations, track first/last times
+  // Aggregate check-ins
   let presentMins = 0
   let firstIn: string | null = null
   let lastOut: string | null = null
@@ -147,7 +160,7 @@ function DayRow({ day }: { day: DayData }) {
     ? timeToMins(day.scheduled!.end_time) - timeToMins(day.scheduled!.start_time)
     : 0
 
-  // Bar: only when schedule exists — overlay actual presence on the scheduled window
+  // Bar calculation for actual check-in
   let barLeftPct = 0
   let barWidthPct = 0
 
@@ -163,7 +176,6 @@ function DayRow({ day }: { day: DayData }) {
       const co = new Date(lastOut)
       ciEndMins = co.getHours() * 60 + co.getMinutes()
     } else {
-      // Active session: use current time as estimate
       const now = new Date()
       ciEndMins = now.getHours() * 60 + now.getMinutes()
     }
@@ -173,8 +185,8 @@ function DayRow({ day }: { day: DayData }) {
     barWidthPct = Math.max(2, barRightPct - barLeftPct)
   }
 
-  // Empty day with no schedule: render minimal row
-  if (!hasSchedule && !hasCheckIn) {
+  // Empty day: no schedule, no check-in, no leave
+  if (!hasSchedule && !hasCheckIn && !hasLeave) {
     return (
       <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed opacity-40">
         <span className="w-6 text-sm font-bold">{DAY_SHORT[day.dayOfWeek]}</span>
@@ -203,6 +215,10 @@ function DayRow({ day }: { day: DayData }) {
                   <span className="text-xs text-muted-foreground">/ {fmtHm(scheduledMins)}</span>
                 )}
               </>
+            ) : hasLeave ? (
+              <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 text-xs border-0">
+                Verlof
+              </Badge>
             ) : (
               <span className="text-xs text-muted-foreground italic">Niet ingecheckt</span>
             )}
@@ -210,22 +226,29 @@ function DayRow({ day }: { day: DayData }) {
         </div>
 
         {/* Time labels: schedule left, actual right */}
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>
-            {hasSchedule
-              ? `${day.scheduled!.start_time.slice(0, 5)}–${day.scheduled!.end_time.slice(0, 5)}`
-              : ''}
-          </span>
-          <span>
-            {hasCheckIn && firstIn
-              ? `${fmtTime(firstIn)}${lastOut ? `–${fmtTime(lastOut)}` : anyActive ? ' (actief)' : ''}`
-              : ''}
-          </span>
-        </div>
+        {(hasSchedule || hasCheckIn) && (
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>
+              {hasSchedule
+                ? `${day.scheduled!.start_time.slice(0, 5)}–${day.scheduled!.end_time.slice(0, 5)}`
+                : ''}
+            </span>
+            <span>
+              {hasCheckIn && firstIn
+                ? `${fmtTime(firstIn)}${lastOut ? `–${fmtTime(lastOut)}` : anyActive ? ' (actief)' : ''}`
+                : ''}
+            </span>
+          </div>
+        )}
 
-        {/* Visual bar: gray = scheduled window, primary = actual presence */}
+        {/* Visual bar */}
         {hasSchedule && (
           <div className="relative h-3 bg-muted rounded-full overflow-hidden">
+            {/* Approved leave: full blue bar */}
+            {hasLeave && !hasCheckIn && (
+              <div className="absolute inset-0 bg-blue-400 rounded-full opacity-70" />
+            )}
+            {/* Actual check-in overlay */}
             {hasCheckIn && barWidthPct > 0 && (
               <div
                 className="absolute top-0 bottom-0 bg-primary rounded-full"

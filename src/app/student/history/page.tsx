@@ -48,6 +48,15 @@ export default async function HistoryPage({
     .lte('valid_from', sundayStr)
     .gte('valid_until', mondayStr)
 
+  // Fetch approved leave requests for this week
+  const { data: leaveRequests } = await supabase
+    .from('leave_requests')
+    .select('date, hours_counted')
+    .eq('user_id', user.id)
+    .eq('status', 'approved')
+    .gte('date', mondayStr)
+    .lte('date', sundayStr)
+
   // Build Mon–Fri day data
   const days = [1, 2, 3, 4, 5].map((dow) => {
     const date = new Date(monday)
@@ -55,6 +64,7 @@ export default async function HistoryPage({
     const isoDate = toDateStr(date)
 
     const scheduled = schedules?.find(s => s.day_of_week === dow) ?? null
+    const approvedLeave = leaveRequests?.find(lr => lr.date === isoDate) ?? null
 
     const dayCheckIns = (checkIns ?? [])
       .filter(ci => toDateStr(new Date(ci.check_in_time)) === isoDate)
@@ -65,7 +75,7 @@ export default async function HistoryPage({
         location_name: (ci.locations as any)?.name ?? 'Onbekend',
       }))
 
-    return { isoDate, dayOfWeek: dow, scheduled, checkIns: dayCheckIns }
+    return { isoDate, dayOfWeek: dow, scheduled, checkIns: dayCheckIns, approvedLeave }
   })
 
   return (
