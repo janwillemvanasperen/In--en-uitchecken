@@ -109,7 +109,7 @@ export default async function StudentDetailPage({ params }: { params: { studentI
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex items-center gap-4">
           <Link href="/admin/my-students">
@@ -146,6 +146,6 @@ export default async function StudentDetailPage({ params }: { params: { studentI
           leaveRequests={leaveRequests || []}
         />
       </main>
-    </div>
+    </>
   )
 }

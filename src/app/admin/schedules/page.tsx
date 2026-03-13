@@ -24,7 +24,7 @@ export default async function AdminSchedulesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex items-center gap-4">
           <Link href="/admin/dashboard">
@@ -40,6 +40,6 @@ export default async function AdminSchedulesPage() {
       <main className="container mx-auto px-4 py-8 max-w-4xl">
         <ScheduleReviewList schedules={schedules || []} coaches={coaches || []} userCoachMap={userCoachMap} />
       </main>
-    </div>
+</>
   )
 }

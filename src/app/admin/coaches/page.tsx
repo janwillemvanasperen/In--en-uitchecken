@@ -32,7 +32,7 @@ export default async function AdminCoachesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex items-center gap-4">
           <Link href="/admin/dashboard">
@@ -48,6 +48,6 @@ export default async function AdminCoachesPage() {
       <main className="container mx-auto px-4 py-8 max-w-4xl">
         <CoachList coaches={coaches || []} studentCounts={studentCounts} />
       </main>
-    </div>
+</>
   )
 }

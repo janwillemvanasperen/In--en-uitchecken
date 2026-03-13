@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import { LogoutButton } from '@/components/logout-button'
 import { Users, MapPin, Calendar, Clock, FileText, Settings, ClipboardCheck, GraduationCap, UserCheck } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -52,17 +51,7 @@ export default async function AdminDashboard() {
   ]
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-          <div className="flex items-center gap-4">
-            <p className="text-sm text-muted-foreground">{user.full_name}</p>
-            <LogoutButton />
-          </div>
-        </div>
-      </header>
-
+    <>
       <main className="container mx-auto px-4 py-8">
         {/* Statistics */}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
@@ -186,6 +175,6 @@ export default async function AdminDashboard() {
           ))}
         </div>
       </main>
-    </div>
+    </>
   )
 }

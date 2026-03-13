@@ -16,7 +16,7 @@ export default async function AdminSettingsPage() {
     .order('key')
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex items-center gap-4">
           <Link href="/admin/dashboard">
@@ -32,6 +32,6 @@ export default async function AdminSettingsPage() {
       <main className="container mx-auto px-4 py-8 max-w-2xl">
         <SettingsForm settings={settings || []} />
       </main>
-    </div>
+</>
   )
 }

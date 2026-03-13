@@ -17,7 +17,7 @@ export default async function AdminLocationsPage() {
     .order('name')
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex items-center gap-4">
           <Link href="/admin/dashboard">
@@ -34,6 +34,6 @@ export default async function AdminLocationsPage() {
         <LocationForm />
         <LocationList locations={locations || []} />
       </main>
-    </div>
+</>
   )
 }
