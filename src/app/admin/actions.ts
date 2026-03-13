@@ -25,12 +25,17 @@ export async function createUser(data: CreateUserInput) {
       },
     })
 
-    // Set coach_id if provided (trigger creates the user first, then we update)
-    if (!authError && authData?.user && data.coach_id) {
-      await adminClient
-        .from('users')
-        .update({ coach_id: data.coach_id })
-        .eq('id', authData.user.id)
+    // Set coach_id and roles if provided (trigger creates the user first, then we update)
+    if (!authError && authData?.user) {
+      const extraUpdate: Record<string, any> = {}
+      if (data.coach_id) extraUpdate.coach_id = data.coach_id
+      if (data.roles) extraUpdate.roles = data.roles
+      if (Object.keys(extraUpdate).length > 0) {
+        await adminClient
+          .from('users')
+          .update(extraUpdate)
+          .eq('id', authData.user.id)
+      }
     }
 
     if (authError) {
@@ -55,6 +60,7 @@ export async function updateUser(userId: string, data: UpdateUserInput) {
     if (data.full_name) updateData.full_name = data.full_name
     if (data.email) updateData.email = data.email
     if (data.role) updateData.role = data.role
+    if (data.roles) updateData.roles = data.roles
     if (data.coach_id !== undefined) updateData.coach_id = data.coach_id || null
 
     const { error } = await adminClient

@@ -13,10 +13,10 @@ export default async function StudentLayout({
   const user = await requireStudent()
   const supabase = await createClient()
 
-  // Fetch profile photo
+  // Fetch profile photo, role and roles
   const { data: profile } = await supabase
     .from('users')
-    .select('profile_photo_url')
+    .select('profile_photo_url, role, roles')
     .eq('id', user.id)
     .single()
 
@@ -38,6 +38,8 @@ export default async function StudentLayout({
           id: user.id,
           full_name: user.full_name,
           profile_photo_url: profile?.profile_photo_url || null,
+          role: profile?.role || user.role,
+          roles: profile?.roles || [user.role],
         }}
         notifications={notifications || []}
         unreadCount={unreadCount}

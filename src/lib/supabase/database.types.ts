@@ -13,7 +13,8 @@ export type Database = {
         Row: {
           id: string
           email: string
-          role: 'student' | 'admin'
+          role: 'student' | 'admin' | 'coach'
+          roles: string[]
           full_name: string
           coach_id: string | null
           profile_photo_url: string | null
@@ -23,7 +24,8 @@ export type Database = {
         Insert: {
           id: string
           email: string
-          role?: 'student' | 'admin'
+          role?: 'student' | 'admin' | 'coach'
+          roles?: string[]
           full_name: string
           coach_id?: string | null
           profile_photo_url?: string | null
@@ -33,7 +35,8 @@ export type Database = {
         Update: {
           id?: string
           email?: string
-          role?: 'student' | 'admin'
+          role?: 'student' | 'admin' | 'coach'
+          roles?: string[]
           full_name?: string
           coach_id?: string | null
           profile_photo_url?: string | null

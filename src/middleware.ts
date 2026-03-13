@@ -1,6 +1,14 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+type UserRole = 'student' | 'admin' | 'coach'
+
+function dashboardForRole(role: UserRole | null | undefined): string {
+  if (role === 'admin') return '/admin/dashboard'
+  if (role === 'coach') return '/coach/dashboard'
+  return '/student/dashboard'
+}
+
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -45,9 +53,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // If user is logged in and trying to access auth pages, redirect to dashboard
+  // If user is logged in and trying to access auth pages, redirect to their dashboard
   if (user && (path === '/auth/login' || path === '/auth/register')) {
-    // Get user role
     const { data: userData } = await supabase
       .from('users')
       .select('role')
@@ -55,16 +62,11 @@ export async function middleware(request: NextRequest) {
       .single()
 
     const url = request.nextUrl.clone()
-    const userRole = (userData as { role: 'student' | 'admin' } | null)?.role
-    if (userRole === 'admin') {
-      url.pathname = '/admin/dashboard'
-    } else {
-      url.pathname = '/student/dashboard'
-    }
+    url.pathname = dashboardForRole((userData as { role: UserRole } | null)?.role)
     return NextResponse.redirect(url)
   }
 
-  // Role-based access control
+  // Role-based access control for /admin/*
   if (user && path.startsWith('/admin')) {
     const { data: userData } = await supabase
       .from('users')
@@ -72,14 +74,15 @@ export async function middleware(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    const userRole = (userData as { role: 'student' | 'admin' } | null)?.role
+    const userRole = (userData as { role: UserRole } | null)?.role
     if (userRole !== 'admin') {
       const url = request.nextUrl.clone()
-      url.pathname = '/student/dashboard'
+      url.pathname = dashboardForRole(userRole)
       return NextResponse.redirect(url)
     }
   }
 
+  // Role-based access control for /student/*
   if (user && path.startsWith('/student')) {
     const { data: userData } = await supabase
       .from('users')
@@ -87,10 +90,26 @@ export async function middleware(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    const userRole = (userData as { role: 'student' | 'admin' } | null)?.role
-    if (userRole === 'admin') {
+    const userRole = (userData as { role: UserRole } | null)?.role
+    if (userRole !== 'student') {
       const url = request.nextUrl.clone()
-      url.pathname = '/admin/dashboard'
+      url.pathname = dashboardForRole(userRole)
+      return NextResponse.redirect(url)
+    }
+  }
+
+  // Role-based access control for /coach/*
+  if (user && path.startsWith('/coach')) {
+    const { data: userData } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    const userRole = (userData as { role: UserRole } | null)?.role
+    if (userRole !== 'coach') {
+      const url = request.nextUrl.clone()
+      url.pathname = dashboardForRole(userRole)
       return NextResponse.redirect(url)
     }
   }

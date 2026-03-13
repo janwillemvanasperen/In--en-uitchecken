@@ -42,7 +42,18 @@ export async function requireAdmin(): Promise<UserProfile> {
 export async function requireStudent(): Promise<UserProfile> {
   const user = await requireAuth()
   if (user.role !== 'student') {
-    redirect('/admin/dashboard')
+    if (user.role === 'admin') redirect('/admin/dashboard')
+    if (user.role === 'coach') redirect('/coach/dashboard')
+    redirect('/auth/login')
+  }
+  return user
+}
+
+export async function requireCoach(): Promise<UserProfile> {
+  const user = await requireAuth()
+  if (user.role !== 'coach') {
+    if (user.role === 'admin') redirect('/admin/dashboard')
+    redirect('/student/dashboard')
   }
   return user
 }

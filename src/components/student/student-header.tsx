@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { AvatarWithFallback } from '@/components/shared/avatar-with-fallback'
+import { RoleSwitcher } from '@/components/shared/role-switcher'
 import { LogoutButton } from '@/components/logout-button'
 import { NotificationsDropdown } from '@/components/student/notifications-dropdown'
 
@@ -17,6 +18,8 @@ interface StudentHeaderProps {
     id: string
     full_name: string
     profile_photo_url?: string | null
+    role: string
+    roles: string[]
   }
   notifications: Notification[]
   unreadCount: number
@@ -31,8 +34,9 @@ export function StudentHeader({ user, notifications, unreadCount }: StudentHeade
           <img src="/logo.png" alt="Scratch MBO Utrecht" className="h-8" />
         </Link>
 
-        {/* Right: Notifications + Avatar + Name + Logout */}
+        {/* Right: Role switcher + Notifications + Avatar + Name + Logout */}
         <div className="flex items-center gap-2">
+          <RoleSwitcher currentRole={user.role} availableRoles={user.roles} />
           <NotificationsDropdown
             userId={user.id}
             initialNotifications={notifications}

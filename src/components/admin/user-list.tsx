@@ -155,7 +155,7 @@ export function UserList({ users, coaches = [] }: { users: User[]; coaches?: Coa
                       </td>
                       <td className="px-4 py-3">
                         <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
-                          {user.role === 'admin' ? 'Admin' : 'Student'}
+                          {user.role === 'admin' ? 'Beheerder' : user.role === 'coach' ? 'Coach' : 'Student'}
                         </Badge>
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell text-muted-foreground">
