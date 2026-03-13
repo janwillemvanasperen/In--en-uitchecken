@@ -65,12 +65,23 @@ export default async function StudentDashboard() {
     .order('check_in_time', { ascending: false })
     .limit(5)
 
+  // Get all locations for auto GPS check-in
+  const { data: locations } = await supabase
+    .from('locations')
+    .select('*')
+
+  // Derive today's schedule
+  const dayOfWeek = today.getDay() || 7
+  const todaySchedule = (weekSchedules || []).find(s => s.day_of_week === dayOfWeek) || null
+
   return (
     <div className="grid gap-6 md:grid-cols-3">
       <CheckInHistoryCard
         initialCheckIn={activeCheckIn}
         userId={user.id}
         recentCheckIns={checkIns || []}
+        locations={locations || []}
+        todaySchedule={todaySchedule}
       />
       <ProgressAndLeaveCard
         weeklyHours={weeklyHours || 0}
