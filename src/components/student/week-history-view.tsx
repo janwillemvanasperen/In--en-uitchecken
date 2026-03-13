@@ -18,7 +18,11 @@ export interface DayData {
   dayOfWeek: number
   scheduled: { start_time: string; end_time: string } | null
   checkIns: CheckInEntry[]
-  approvedLeave: { hours_counted: number } | null
+  approvedLeave: {
+    hours_counted: number
+    start_time: string | null  // null = hele dag
+    end_time: string | null
+  } | null
 }
 
 interface WeekHistoryViewProps {
@@ -42,6 +46,16 @@ function fmtTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
 }
 
+/** Minutes covered by approved leave for a day */
+function leaveMins(leave: DayData['approvedLeave'], scheduledMins: number): number {
+  if (!leave) return 0
+  if (leave.start_time && leave.end_time) {
+    return timeToMins(leave.end_time) - timeToMins(leave.start_time)
+  }
+  // Full-day leave: cover the entire scheduled block
+  return scheduledMins
+}
+
 export function WeekHistoryView({ weekOffset, mondayIso, days }: WeekHistoryViewProps) {
   const monday = new Date(mondayIso)
   const friday = new Date(mondayIso)
@@ -53,15 +67,13 @@ export function WeekHistoryView({ weekOffset, mondayIso, days }: WeekHistoryView
   let totalScheduledMins = 0
 
   for (const day of days) {
-    const scheduledMins = day.scheduled
+    const schedMins = day.scheduled
       ? timeToMins(day.scheduled.end_time) - timeToMins(day.scheduled.start_time)
       : 0
 
-    if (day.scheduled) {
-      totalScheduledMins += scheduledMins
-    }
+    if (day.scheduled) totalScheduledMins += schedMins
 
-    // Actual check-ins
+    // Actual check-ins (all days, including non-scheduled)
     for (const ci of day.checkIns) {
       if (ci.check_out_time) {
         totalPresentMins += Math.floor(
@@ -70,9 +82,13 @@ export function WeekHistoryView({ weekOffset, mondayIso, days }: WeekHistoryView
       }
     }
 
-    // Approved leave (without check-in) counts as fully present for the scheduled hours
-    if (day.approvedLeave && day.checkIns.length === 0 && scheduledMins > 0) {
-      totalPresentMins += scheduledMins
+    // Approved leave contributes to present minutes (only the leave duration, not double-counting with check-ins)
+    if (day.approvedLeave) {
+      const leaveMin = leaveMins(day.approvedLeave, schedMins)
+      // Avoid double-counting: only add leave if no check-in covers this day
+      if (day.checkIns.length === 0) {
+        totalPresentMins += leaveMin
+      }
     }
   }
 
@@ -137,6 +153,8 @@ function DayRow({ day }: { day: DayData }) {
   const hasSchedule = !!day.scheduled
   const hasCheckIn = day.checkIns.length > 0
   const hasLeave = !!day.approvedLeave
+  const isPartialLeave = hasLeave && !!(day.approvedLeave!.start_time && day.approvedLeave!.end_time)
+  const isFullLeave = hasLeave && !isPartialLeave
 
   // Aggregate check-ins
   let presentMins = 0
@@ -160,30 +178,7 @@ function DayRow({ day }: { day: DayData }) {
     ? timeToMins(day.scheduled!.end_time) - timeToMins(day.scheduled!.start_time)
     : 0
 
-  // Bar calculation for actual check-in
-  let barLeftPct = 0
-  let barWidthPct = 0
-
-  if (hasSchedule && hasCheckIn && firstIn) {
-    const schedStart = timeToMins(day.scheduled!.start_time)
-    const schedDuration = timeToMins(day.scheduled!.end_time) - schedStart
-
-    const ciStart = new Date(firstIn)
-    const ciStartMins = ciStart.getHours() * 60 + ciStart.getMinutes()
-
-    let ciEndMins: number
-    if (lastOut) {
-      const co = new Date(lastOut)
-      ciEndMins = co.getHours() * 60 + co.getMinutes()
-    } else {
-      const now = new Date()
-      ciEndMins = now.getHours() * 60 + now.getMinutes()
-    }
-
-    barLeftPct = Math.max(0, Math.min(100, ((ciStartMins - schedStart) / schedDuration) * 100))
-    const barRightPct = Math.max(0, Math.min(100, ((ciEndMins - schedStart) / schedDuration) * 100))
-    barWidthPct = Math.max(2, barRightPct - barLeftPct)
-  }
+  const leaveMin = leaveMins(day.approvedLeave, scheduledMins)
 
   // Empty day: no schedule, no check-in, no leave
   if (!hasSchedule && !hasCheckIn && !hasLeave) {
@@ -196,59 +191,103 @@ function DayRow({ day }: { day: DayData }) {
     )
   }
 
+  // Bar: check-in overlay on scheduled window
+  let barLeftPct = 0
+  let barWidthPct = 0
+  if (hasSchedule && hasCheckIn && firstIn) {
+    const schedStart = timeToMins(day.scheduled!.start_time)
+    const schedDuration = timeToMins(day.scheduled!.end_time) - schedStart
+    const ciStart = new Date(firstIn)
+    const ciStartMins = ciStart.getHours() * 60 + ciStart.getMinutes()
+    let ciEndMins: number
+    if (lastOut) {
+      const co = new Date(lastOut)
+      ciEndMins = co.getHours() * 60 + co.getMinutes()
+    } else {
+      const now = new Date()
+      ciEndMins = now.getHours() * 60 + now.getMinutes()
+    }
+    barLeftPct = Math.max(0, Math.min(100, ((ciStartMins - schedStart) / schedDuration) * 100))
+    const barRightPct = Math.max(0, Math.min(100, ((ciEndMins - schedStart) / schedDuration) * 100))
+    barWidthPct = Math.max(2, barRightPct - barLeftPct)
+  }
+
+  // Leave bar position (partial day leave)
+  let leaveBarLeftPct = 0
+  let leaveBarWidthPct = isFullLeave ? 100 : 0
+  if (hasSchedule && isPartialLeave) {
+    const schedStart = timeToMins(day.scheduled!.start_time)
+    const schedDuration = timeToMins(day.scheduled!.end_time) - schedStart
+    const lvStart = timeToMins(day.approvedLeave!.start_time!)
+    const lvEnd = timeToMins(day.approvedLeave!.end_time!)
+    leaveBarLeftPct = Math.max(0, Math.min(100, ((lvStart - schedStart) / schedDuration) * 100))
+    const leaveBarRightPct = Math.max(0, Math.min(100, ((lvEnd - schedStart) / schedDuration) * 100))
+    leaveBarWidthPct = Math.max(2, leaveBarRightPct - leaveBarLeftPct)
+  }
+
   return (
     <Card>
       <CardContent className="py-3 space-y-2">
-        {/* Top row: day + duration summary */}
+        {/* Top row */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="w-6 text-sm font-bold">{DAY_SHORT[day.dayOfWeek]}</span>
             <span className="text-xs text-muted-foreground">{dateLabel}</span>
           </div>
-          <div className="flex items-baseline gap-1 text-sm">
-            {hasCheckIn ? (
-              <>
-                <span className="font-medium">
-                  {fmtHm(presentMins)}{anyActive && !lastOut ? ' (actief)' : ''}
-                </span>
-                {hasSchedule && (
-                  <span className="text-xs text-muted-foreground">/ {fmtHm(scheduledMins)}</span>
+          <div className="flex items-center gap-2 text-sm">
+            {hasCheckIn && (
+              <span className="font-medium">
+                {fmtHm(presentMins)}{anyActive && !lastOut ? ' (actief)' : ''}
+                {hasSchedule && !hasLeave && (
+                  <span className="text-xs text-muted-foreground font-normal ml-1">/ {fmtHm(scheduledMins)}</span>
                 )}
-              </>
-            ) : hasLeave ? (
-              <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 text-xs border-0">
-                Verlof
+              </span>
+            )}
+            {hasLeave && (
+              <Badge className={`text-xs border-0 ${isPartialLeave ? 'bg-blue-100 text-blue-800 hover:bg-blue-100' : 'bg-blue-100 text-blue-800 hover:bg-blue-100'}`}>
+                {isPartialLeave ? 'Deels verlof' : 'Verlof'}
               </Badge>
-            ) : (
+            )}
+            {!hasCheckIn && !hasLeave && (
               <span className="text-xs text-muted-foreground italic">Niet ingecheckt</span>
             )}
           </div>
         </div>
 
         {/* Time labels: schedule left, actual right */}
-        {(hasSchedule || hasCheckIn) && (
+        {(hasSchedule || hasCheckIn || hasLeave) && (
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>
               {hasSchedule
                 ? `${day.scheduled!.start_time.slice(0, 5)}–${day.scheduled!.end_time.slice(0, 5)}`
                 : ''}
             </span>
-            <span>
-              {hasCheckIn && firstIn
-                ? `${fmtTime(firstIn)}${lastOut ? `–${fmtTime(lastOut)}` : anyActive ? ' (actief)' : ''}`
-                : ''}
+            <span className="flex items-center gap-2">
+              {isPartialLeave && (
+                <span className="text-blue-600">
+                  {day.approvedLeave!.start_time!.slice(0, 5)}–{day.approvedLeave!.end_time!.slice(0, 5)}
+                </span>
+              )}
+              {hasCheckIn && firstIn && (
+                <span>
+                  {fmtTime(firstIn)}{lastOut ? `–${fmtTime(lastOut)}` : anyActive ? ' (actief)' : ''}
+                </span>
+              )}
             </span>
           </div>
         )}
 
-        {/* Visual bar */}
+        {/* Visual bar (only when scheduled) */}
         {hasSchedule && (
           <div className="relative h-3 bg-muted rounded-full overflow-hidden">
-            {/* Approved leave: full blue bar */}
-            {hasLeave && !hasCheckIn && (
-              <div className="absolute inset-0 bg-blue-400 rounded-full opacity-70" />
+            {/* Verlof-blok (blauw) */}
+            {hasLeave && leaveBarWidthPct > 0 && (
+              <div
+                className="absolute top-0 bottom-0 bg-blue-400 opacity-70"
+                style={{ left: `${leaveBarLeftPct}%`, width: `${leaveBarWidthPct}%` }}
+              />
             )}
-            {/* Actual check-in overlay */}
+            {/* Daadwerkelijke check-in (primary kleur, bovenop verlof) */}
             {hasCheckIn && barWidthPct > 0 && (
               <div
                 className="absolute top-0 bottom-0 bg-primary rounded-full"
@@ -256,6 +295,14 @@ function DayRow({ day }: { day: DayData }) {
               />
             )}
           </div>
+        )}
+
+        {/* Extra: check-in op dag zonder rooster */}
+        {!hasSchedule && hasCheckIn && (
+          <p className="text-xs text-muted-foreground">
+            {firstIn && `${fmtTime(firstIn)}${lastOut ? `–${fmtTime(lastOut)}` : anyActive ? ' (actief)' : ''}`}
+            {' · geen rooster'}
+          </p>
         )}
       </CardContent>
     </Card>
