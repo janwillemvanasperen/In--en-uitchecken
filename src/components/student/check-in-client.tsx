@@ -23,11 +23,12 @@ interface CheckInClientProps {
   activeCheckIn: ActiveCheckIn | null
   todaySchedule: Schedule | null
   userId: string
+  initialMode?: 'gps' | 'qr'
 }
 
-export function CheckInClient({ locations, activeCheckIn, todaySchedule, userId }: CheckInClientProps) {
+export function CheckInClient({ locations, activeCheckIn, todaySchedule, userId, initialMode = 'gps' }: CheckInClientProps) {
   const router = useRouter()
-  const [mode, setMode] = useState<'gps' | 'qr'>('gps')
+  const [mode, setMode] = useState<'gps' | 'qr'>(initialMode)
   const [selectedLocationId, setSelectedLocationId] = useState<string>('')
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [error, setError] = useState<string | null>(null)

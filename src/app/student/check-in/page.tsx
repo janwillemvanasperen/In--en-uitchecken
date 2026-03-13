@@ -2,7 +2,11 @@ import { requireStudent } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { CheckInClient } from '@/components/student/check-in-client'
 
-export default async function CheckInPage() {
+export default async function CheckInPage({
+  searchParams,
+}: {
+  searchParams: { mode?: string }
+}) {
   const user = await requireStudent()
   const supabase = await createClient()
 
@@ -40,6 +44,7 @@ export default async function CheckInPage() {
       activeCheckIn={activeCheckIn}
       todaySchedule={todaySchedule}
       userId={user.id}
+      initialMode={searchParams.mode === 'qr' ? 'qr' : 'gps'}
     />
   )
 }

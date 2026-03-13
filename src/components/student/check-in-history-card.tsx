@@ -1,14 +1,17 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
 import { formatDuration } from '@/lib/date-utils'
-import { Clock, MapPin, LogIn, LogOut, History } from 'lucide-react'
+import { getUserLocation, isWithinRadius } from '@/lib/geolocation'
+import { checkIn, checkOut } from '@/app/student/actions'
+import { Clock, MapPin, LogIn, LogOut, History, Loader2 } from 'lucide-react'
 import Link from 'next/link'
-import type { ActiveCheckIn } from '@/types'
+import type { ActiveCheckIn, Location } from '@/types'
 
 interface RecentCheckIn {
   id: string
@@ -21,45 +24,50 @@ interface CheckInHistoryCardProps {
   initialCheckIn: ActiveCheckIn | null
   userId: string
   recentCheckIns: RecentCheckIn[]
+  locations: Location[]
+  todaySchedule: { start_time: string; end_time: string } | null
 }
 
-export function CheckInHistoryCard({ initialCheckIn, userId, recentCheckIns }: CheckInHistoryCardProps) {
+export function CheckInHistoryCard({
+  initialCheckIn,
+  userId,
+  recentCheckIns,
+  locations,
+  todaySchedule,
+}: CheckInHistoryCardProps) {
+  const router = useRouter()
   const [activeCheckIn, setActiveCheckIn] = useState<ActiveCheckIn | null>(initialCheckIn)
   const [elapsedTime, setElapsedTime] = useState(0)
+  const [gpsLoading, setGpsLoading] = useState(false)
+  const [checkOutPending, startCheckOut] = useTransition()
   const supabase = createClient()
 
-  // Real-time subscription for check-ins
+  // Real-time subscription
   useEffect(() => {
     const channel = supabase
       .channel('check-ins-dashboard')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'check_ins',
-          filter: `user_id=eq.${userId}`,
-        },
-        async (payload) => {
-          if (payload.eventType === 'INSERT') {
-            const newCheckIn = payload.new as any
-            if (!newCheckIn.check_out_time) {
-              const { data } = await supabase
-                .from('check_ins')
-                .select('*, locations(*)')
-                .eq('id', newCheckIn.id)
-                .single()
-              if (data) setActiveCheckIn(data as ActiveCheckIn)
-            }
-          } else if (payload.eventType === 'UPDATE') {
-            const updated = payload.new as any
-            if (updated.check_out_time && activeCheckIn?.id === updated.id) {
-              setActiveCheckIn(null)
-              setElapsedTime(0)
-            }
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'check_ins',
+        filter: `user_id=eq.${userId}`,
+      }, async (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const newCheckIn = payload.new as any
+          if (!newCheckIn.check_out_time) {
+            const { data } = await supabase
+              .from('check_ins').select('*, locations(*)')
+              .eq('id', newCheckIn.id).single()
+            if (data) setActiveCheckIn(data as ActiveCheckIn)
+          }
+        } else if (payload.eventType === 'UPDATE') {
+          const updated = payload.new as any
+          if (updated.check_out_time && activeCheckIn?.id === updated.id) {
+            setActiveCheckIn(null)
+            setElapsedTime(0)
           }
         }
-      )
+      })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [userId, supabase, activeCheckIn])
@@ -75,6 +83,44 @@ export function CheckInHistoryCard({ initialCheckIn, userId, recentCheckIns }: C
     return () => clearInterval(interval)
   }, [activeCheckIn])
 
+  // Auto GPS check-in
+  async function handleAutoCheckIn() {
+    setGpsLoading(true)
+    try {
+      const gps = await getUserLocation()
+      const match = locations.find(loc =>
+        isWithinRadius(gps.lat, gps.lng, Number(loc.latitude), Number(loc.longitude), 500)
+      )
+      if (!match) {
+        // No location nearby — fall back to full check-in page
+        router.push('/student/check-in?mode=qr')
+        return
+      }
+      const result = await checkIn({
+        locationId: match.id,
+        userLat: gps.lat,
+        userLng: gps.lng,
+        expectedStart: todaySchedule?.start_time ?? '00:00',
+        expectedEnd: todaySchedule?.end_time ?? '23:59',
+      })
+      if (result?.error) {
+        router.push('/student/check-in?mode=qr')
+      }
+    } catch {
+      // GPS unavailable or denied — fall back
+      router.push('/student/check-in?mode=qr')
+    } finally {
+      setGpsLoading(false)
+    }
+  }
+
+  // Direct check-out
+  function handleCheckOut() {
+    startCheckOut(async () => {
+      await checkOut()
+    })
+  }
+
   return (
     <Card className={`flex flex-col ${activeCheckIn ? 'border-green-300 bg-green-50/30' : ''}`}>
       <CardHeader className="pb-3">
@@ -85,7 +131,7 @@ export function CheckInHistoryCard({ initialCheckIn, userId, recentCheckIns }: C
       </CardHeader>
       <CardContent className="flex flex-col flex-1 gap-4">
 
-        {/* Check-in / Check-out action — most prominent */}
+        {/* Check-in / Check-out — most prominent */}
         {activeCheckIn ? (
           <div className="flex flex-col items-center text-center gap-2 py-2">
             <Badge className="bg-green-600 hover:bg-green-600">Ingecheckt</Badge>
@@ -96,23 +142,33 @@ export function CheckInHistoryCard({ initialCheckIn, userId, recentCheckIns }: C
             <p className="text-3xl font-bold text-green-600 tabular-nums">
               {formatDuration(elapsedTime)}
             </p>
-            <Link href="/student/check-in" className="w-full">
-              <Button variant="destructive" className="w-full" size="lg">
-                <LogOut className="h-4 w-4 mr-2" />
-                Check uit
-              </Button>
-            </Link>
+            <Button
+              variant="destructive"
+              className="w-full"
+              size="lg"
+              onClick={handleCheckOut}
+              disabled={checkOutPending}
+            >
+              {checkOutPending
+                ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                : <LogOut className="h-4 w-4 mr-2" />}
+              Check uit
+            </Button>
           </div>
         ) : (
           <div className="flex flex-col items-center text-center gap-2 py-2">
             <Badge variant="secondary">Uitgecheckt</Badge>
             <p className="text-sm text-muted-foreground">Niet ingecheckt</p>
-            <Link href="/student/check-in" className="w-full">
-              <Button className="w-full" size="lg">
-                <LogIn className="h-4 w-4 mr-2" />
-                Check in
-              </Button>
-            </Link>
+            <Button
+              className="w-full"
+              size="lg"
+              onClick={handleAutoCheckIn}
+              disabled={gpsLoading}
+            >
+              {gpsLoading
+                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Locatie zoeken…</>
+                : <><LogIn className="h-4 w-4 mr-2" />Check in</>}
+            </Button>
           </div>
         )}
 
@@ -127,18 +183,16 @@ export function CheckInHistoryCard({ initialCheckIn, userId, recentCheckIns }: C
                     {new Date(ci.check_in_time).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })}
                   </p>
                 </div>
-                {ci.check_out_time ? (
-                  <span className="text-xs text-green-600">Uit</span>
-                ) : (
-                  <span className="text-xs text-primary font-medium">Actief</span>
-                )}
+                {ci.check_out_time
+                  ? <span className="text-xs text-green-600">Uit</span>
+                  : <span className="text-xs text-primary font-medium">Actief</span>}
               </div>
             ))}
           </div>
         )}
 
         {/* History button — pushed to bottom */}
-        <div className={`mt-auto border-t pt-3`}>
+        <div className="mt-auto border-t pt-3">
           <Link href="/student/history">
             <Button variant="outline" size="sm" className="w-full">
               <History className="h-4 w-4 mr-2" />
