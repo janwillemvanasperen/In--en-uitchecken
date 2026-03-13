@@ -76,14 +76,14 @@ export function CheckInHistoryCard({ initialCheckIn, userId, recentCheckIns }: C
   }, [activeCheckIn])
 
   return (
-    <Card className={activeCheckIn ? 'border-green-300 bg-green-50/30' : ''}>
+    <Card className={`flex flex-col ${activeCheckIn ? 'border-green-300 bg-green-50/30' : ''}`}>
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           <Clock className="h-4 w-4 text-primary" />
           Aanwezigheid
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="flex flex-col flex-1 gap-4">
 
         {/* Check-in / Check-out action — most prominent */}
         {activeCheckIn ? (
@@ -137,8 +137,8 @@ export function CheckInHistoryCard({ initialCheckIn, userId, recentCheckIns }: C
           </div>
         )}
 
-        {/* History button */}
-        <div className={recentCheckIns.length > 0 ? 'border-t pt-3' : ''}>
+        {/* History button — pushed to bottom */}
+        <div className={`mt-auto border-t pt-3`}>
           <Link href="/student/history">
             <Button variant="outline" size="sm" className="w-full">
               <History className="h-4 w-4 mr-2" />

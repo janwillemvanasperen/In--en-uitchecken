@@ -20,14 +20,14 @@ export function WeekScheduleCard({ schedules }: WeekScheduleCardProps) {
   }
 
   return (
-    <Card>
+    <Card className="flex flex-col">
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           <Calendar className="h-4 w-4 text-primary" />
           Weekrooster
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex flex-col flex-1">
         <div className="space-y-1.5">
           {[1, 2, 3, 4, 5].map((day) => {
             const s = scheduleMap[day]
@@ -54,7 +54,7 @@ export function WeekScheduleCard({ schedules }: WeekScheduleCardProps) {
             )
           })}
         </div>
-        <div className="mt-3 pt-3 border-t">
+        <div className="mt-auto pt-3 border-t">
           <Link href="/student/schedule">
             <Button variant="outline" size="sm" className="w-full">
               Beheer rooster

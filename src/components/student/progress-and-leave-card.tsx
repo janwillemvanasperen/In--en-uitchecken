@@ -33,14 +33,14 @@ export function ProgressAndLeaveCard({
   const leaveTotal = pendingCount + approvedCount + rejectedCount
 
   return (
-    <Card>
+    <Card className="flex flex-col">
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           <TrendingUp className="h-4 w-4 text-primary" />
           Weekvoortgang & Verlof
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-5">
+      <CardContent className="flex flex-col flex-1 space-y-5">
         {/* Weekly progress */}
         <div className="space-y-2">
           <div className="flex items-baseline gap-2">
@@ -113,8 +113,8 @@ export function ProgressAndLeaveCard({
               )}
             </div>
           )}
-          <Link href="/student/leave-requests">
-            <Button variant="outline" size="sm" className="w-full mt-2">
+          <Link href="/student/leave-requests" className="block mt-auto pt-3 border-t">
+            <Button variant="outline" size="sm" className="w-full">
               Verlof aanvragen
             </Button>
           </Link>
