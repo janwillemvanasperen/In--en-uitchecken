@@ -1,3 +1,4 @@
+import React from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -180,7 +181,44 @@ export function DayRow({ day, compact = false }: { day: DayData; compact?: boole
 
   const leaveMin = leaveMins(day.approvedLeave, scheduledMins)
 
-  // Empty day: no schedule, no check-in, no leave
+  // COMPACT: single-line row (used on dashboard)
+  if (compact) {
+    const scheduleLabel = hasSchedule
+      ? `${day.scheduled!.start_time.slice(0, 5)}–${day.scheduled!.end_time.slice(0, 5)}`
+      : '–'
+
+    let statusEl: React.ReactNode
+    if (hasLeave && !hasCheckIn) {
+      statusEl = (
+        <Badge className="text-xs border-0 bg-blue-100 text-blue-800 hover:bg-blue-100">
+          {isPartialLeave ? 'Deels verlof' : 'Verlof'}
+        </Badge>
+      )
+    } else if (hasCheckIn) {
+      statusEl = (
+        <span className="font-medium text-sm">
+          {fmtHm(presentMins)}{anyActive && !lastOut ? ' (actief)' : ''}
+        </span>
+      )
+    } else if (hasSchedule) {
+      statusEl = <span className="text-xs text-muted-foreground italic">Niet ingecheckt</span>
+    } else {
+      statusEl = <span className="text-muted-foreground text-sm">–</span>
+    }
+
+    return (
+      <div className={`flex items-center justify-between py-1 text-sm ${!hasSchedule && !hasCheckIn && !hasLeave ? 'opacity-40' : ''}`}>
+        <div className="flex items-center gap-2 w-24 shrink-0">
+          <span className="w-6 font-bold">{DAY_SHORT[day.dayOfWeek]}</span>
+          <span className="text-xs text-muted-foreground">{dateLabel}</span>
+        </div>
+        <span className="text-xs text-muted-foreground">{scheduleLabel}</span>
+        <div className="text-right">{statusEl}</div>
+      </div>
+    )
+  }
+
+  // Empty day (full view): no schedule, no check-in, no leave
   if (!hasSchedule && !hasCheckIn && !hasLeave) {
     return (
       <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed opacity-40">
@@ -306,8 +344,5 @@ export function DayRow({ day, compact = false }: { day: DayData; compact?: boole
       </div>
   )
 
-  if (compact) {
-    return <div className="rounded-lg border px-2">{content}</div>
-  }
   return <Card><CardContent className="p-0">{content}</CardContent></Card>
 }
