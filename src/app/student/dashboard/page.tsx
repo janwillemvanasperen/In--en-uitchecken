@@ -14,12 +14,10 @@ export default async function StudentDashboard() {
   const today = new Date()
   const todayStr = toLocalDateStr(today)
   const monday = getMonday(today)
+  const nextMonday = new Date(monday)
+  nextMonday.setDate(monday.getDate() + 7)
   const mondayStr = toLocalDateStr(monday)
   const sundayStr = toLocalDateStr(new Date(monday.getTime() + 6 * 86400000))
-
-  const yesterday = new Date(today)
-  yesterday.setDate(today.getDate() - 1)
-  const yesterdayStr = toLocalDateStr(yesterday)
 
   // Get active check-in
   const { data: activeCheckIn } = await supabase
@@ -45,15 +43,6 @@ export default async function StudentDashboard() {
     .lte('valid_from', sundayStr)
     .gte('valid_until', mondayStr)
     .order('valid_from', { ascending: false })
-
-  // Helper: find the schedule valid for a specific date
-  function scheduleForDate(isoDate: string) {
-    const d = new Date(isoDate + 'T12:00:00')
-    const dow = d.getDay() || 7
-    return (weekSchedules || []).find(s =>
-      s.day_of_week === dow && s.valid_from <= isoDate && s.valid_until >= isoDate
-    ) ?? null
-  }
 
   // Calculate scheduled weekly hours (per-day filtered)
   let scheduledWeeklyHours = 0
@@ -81,42 +70,42 @@ export default async function StudentDashboard() {
   const approvedLeave = (leaveRequests || []).filter(lr => lr.status === 'approved').length
   const rejectedLeave = (leaveRequests || []).filter(lr => lr.status === 'rejected').length
 
-  // Fetch check-ins for yesterday + today (for mini 2-day view)
-  const twoDaysEnd = new Date(today)
-  twoDaysEnd.setDate(today.getDate() + 1)
-  twoDaysEnd.setHours(0, 0, 0, 0)
-  const twoDaysStart = new Date(yesterday)
-  twoDaysStart.setHours(0, 0, 0, 0)
-
-  const { data: recentCheckInsRaw } = await supabase
+  // Fetch check-ins for the current week
+  const { data: weekCheckIns } = await supabase
     .from('check_ins')
     .select('id, check_in_time, check_out_time, locations(name)')
     .eq('user_id', user.id)
-    .gte('check_in_time', twoDaysStart.toISOString())
-    .lt('check_in_time', twoDaysEnd.toISOString())
+    .gte('check_in_time', monday.toISOString())
+    .lt('check_in_time', nextMonday.toISOString())
     .order('check_in_time', { ascending: true })
 
-  // Fetch approved leave for yesterday + today
-  const { data: recentLeaveRaw } = await supabase
+  // Fetch approved leave for the current week
+  const { data: weekLeave } = await supabase
     .from('leave_requests')
     .select('date, hours_counted, start_time, end_time')
     .eq('user_id', user.id)
     .eq('status', 'approved')
-    .gte('date', yesterdayStr)
-    .lte('date', todayStr)
+    .gte('date', mondayStr)
+    .lte('date', sundayStr)
 
-  // Build recentDays (yesterday + today) for mini view
-  const recentDays: DayData[] = [yesterdayStr, todayStr].map((isoDate) => {
-    const d = new Date(isoDate + 'T12:00:00')
-    const dow = d.getDay() || 7
-    const scheduled = scheduleForDate(isoDate)
-    const lr = (recentLeaveRaw || []).find(l => l.date === isoDate) ?? null
+  // Build DayData for Mon–Fri of the current week
+  const currentWeekDays: DayData[] = [1, 2, 3, 4, 5].map((dow) => {
+    const date = new Date(monday)
+    date.setDate(monday.getDate() + (dow - 1))
+    const isoDate = toLocalDateStr(date)
+
+    const scheduled = (weekSchedules || []).find(s =>
+      s.day_of_week === dow && s.valid_from <= isoDate && s.valid_until >= isoDate
+    ) ?? null
+
+    const lr = (weekLeave || []).find(l => l.date === isoDate) ?? null
     const approvedLeaveDay = lr ? {
       hours_counted: lr.hours_counted,
       start_time: lr.start_time ?? null,
       end_time: lr.end_time ?? null,
     } : null
-    const dayCheckIns = (recentCheckInsRaw || [])
+
+    const dayCheckIns = (weekCheckIns || [])
       .filter(ci => toLocalDateStr(new Date(ci.check_in_time)) === isoDate)
       .map(ci => ({
         id: ci.id,
@@ -124,6 +113,7 @@ export default async function StudentDashboard() {
         check_out_time: ci.check_out_time,
         location_name: (ci.locations as any)?.name ?? 'Onbekend',
       }))
+
     return { isoDate, dayOfWeek: dow, scheduled, checkIns: dayCheckIns, approvedLeave: approvedLeaveDay }
   })
 
@@ -143,7 +133,6 @@ export default async function StudentDashboard() {
       <CheckInHistoryCard
         initialCheckIn={activeCheckIn}
         userId={user.id}
-        recentDays={recentDays}
         locations={locations || []}
         todaySchedule={todaySchedule}
       />
@@ -154,10 +143,7 @@ export default async function StudentDashboard() {
         approvedCount={approvedLeave}
         rejectedCount={rejectedLeave}
       />
-      <WeekScheduleCard
-        schedules={weekSchedules || []}
-        mondayIso={monday.toISOString()}
-      />
+      <WeekScheduleCard days={currentWeekDays} />
     </div>
   )
 }

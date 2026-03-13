@@ -12,13 +12,10 @@ import { checkIn, checkOut } from '@/app/student/actions'
 import { Clock, MapPin, LogIn, LogOut, History, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import type { ActiveCheckIn, Location } from '@/types'
-import { DayRow } from '@/components/student/week-history-view'
-import type { DayData } from '@/components/student/week-history-view'
 
 interface CheckInHistoryCardProps {
   initialCheckIn: ActiveCheckIn | null
   userId: string
-  recentDays: DayData[]
   locations: Location[]
   todaySchedule: { start_time: string; end_time: string } | null
 }
@@ -26,7 +23,6 @@ interface CheckInHistoryCardProps {
 export function CheckInHistoryCard({
   initialCheckIn,
   userId,
-  recentDays,
   locations,
   todaySchedule,
 }: CheckInHistoryCardProps) {
@@ -124,7 +120,7 @@ export function CheckInHistoryCard({
       </CardHeader>
       <CardContent className="flex flex-col flex-1 gap-4">
 
-        {/* Check-in / Check-out — most prominent */}
+        {/* Check-in / Check-out */}
         {activeCheckIn ? (
           <div className="flex flex-col items-center text-center gap-2 py-2">
             <Badge className="bg-green-600 hover:bg-green-600">Ingecheckt</Badge>
@@ -165,14 +161,7 @@ export function CheckInHistoryCard({
           </div>
         )}
 
-        {/* Mini 2-day history */}
-        <div className="border-t pt-3 space-y-2">
-          {recentDays.map((day) => (
-            <DayRow key={day.isoDate} day={day} compact />
-          ))}
-        </div>
-
-        {/* History button — pushed to bottom */}
+        {/* History button */}
         <div className="mt-auto border-t pt-3">
           <Link href="/student/history">
             <Button variant="outline" size="sm" className="w-full">
