@@ -3,7 +3,6 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { requireAuth } from '@/lib/auth'
-import { redirect } from 'next/navigation'
 
 export async function switchRole(newRole: string) {
   const user = await requireAuth()
@@ -31,8 +30,11 @@ export async function switchRole(newRole: string) {
     return { error: 'Kon niet wisselen van rol' }
   }
 
-  // Redirect to the new role's dashboard
-  if (newRole === 'admin') redirect('/admin/dashboard')
-  if (newRole === 'coach') redirect('/coach/dashboard')
-  redirect('/student/dashboard')
+  // Return the target dashboard so the client can navigate
+  const dashboardMap: Record<string, string> = {
+    admin: '/admin/dashboard',
+    coach: '/coach/dashboard',
+    student: '/student/dashboard',
+  }
+  return { redirectTo: dashboardMap[newRole] ?? '/student/dashboard' }
 }

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { switchRole } from '@/app/actions'
 import { Button } from '@/components/ui/button'
 import {
@@ -24,6 +25,7 @@ interface RoleSwitcherProps {
 
 export function RoleSwitcher({ currentRole, availableRoles }: RoleSwitcherProps) {
   const [isPending, startTransition] = useTransition()
+  const router = useRouter()
   const otherRoles = availableRoles.filter(r => r !== currentRole)
 
   // Only show if user has more than one role
@@ -31,7 +33,10 @@ export function RoleSwitcher({ currentRole, availableRoles }: RoleSwitcherProps)
 
   const handleSwitch = (role: string) => {
     startTransition(async () => {
-      await switchRole(role)
+      const result = await switchRole(role)
+      if (result?.redirectTo) {
+        router.push(result.redirectTo)
+      }
     })
   }
 

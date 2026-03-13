@@ -81,7 +81,7 @@ export function ProgressAndLeaveCard({
         <div className="border-t" />
 
         {/* Leave summary */}
-        <div className="space-y-2">
+        <div className="flex flex-col flex-1 space-y-2">
           <p className="text-sm font-medium">Verlofaanvragen</p>
           {leaveTotal === 0 ? (
             <p className="text-sm text-muted-foreground">Geen verlofaanvragen</p>
