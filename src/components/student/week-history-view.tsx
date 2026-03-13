@@ -147,7 +147,7 @@ export function WeekHistoryView({ weekOffset, mondayIso, days }: WeekHistoryView
   )
 }
 
-function DayRow({ day }: { day: DayData }) {
+export function DayRow({ day, compact = false }: { day: DayData; compact?: boolean }) {
   const date = new Date(day.isoDate + 'T12:00:00')
   const dateLabel = date.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
   const hasSchedule = !!day.scheduled
@@ -225,9 +225,8 @@ function DayRow({ day }: { day: DayData }) {
     leaveBarWidthPct = Math.max(2, leaveBarRightPct - leaveBarLeftPct)
   }
 
-  return (
-    <Card>
-      <CardContent className="py-3 space-y-2">
+  const content = (
+    <div className="py-3 space-y-2">
         {/* Top row */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -304,7 +303,11 @@ function DayRow({ day }: { day: DayData }) {
             {' · geen rooster'}
           </p>
         )}
-      </CardContent>
-    </Card>
+      </div>
   )
+
+  if (compact) {
+    return <div className="rounded-lg border px-2">{content}</div>
+  }
+  return <Card><CardContent className="p-0">{content}</CardContent></Card>
 }

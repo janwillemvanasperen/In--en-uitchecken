@@ -12,18 +12,13 @@ import { checkIn, checkOut } from '@/app/student/actions'
 import { Clock, MapPin, LogIn, LogOut, History, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import type { ActiveCheckIn, Location } from '@/types'
-
-interface RecentCheckIn {
-  id: string
-  check_in_time: string
-  check_out_time: string | null
-  locations: { name: string } | null
-}
+import { DayRow } from '@/components/student/week-history-view'
+import type { DayData } from '@/components/student/week-history-view'
 
 interface CheckInHistoryCardProps {
   initialCheckIn: ActiveCheckIn | null
   userId: string
-  recentCheckIns: RecentCheckIn[]
+  recentDays: DayData[]
   locations: Location[]
   todaySchedule: { start_time: string; end_time: string } | null
 }
@@ -31,7 +26,7 @@ interface CheckInHistoryCardProps {
 export function CheckInHistoryCard({
   initialCheckIn,
   userId,
-  recentCheckIns,
+  recentDays,
   locations,
   todaySchedule,
 }: CheckInHistoryCardProps) {
@@ -92,7 +87,6 @@ export function CheckInHistoryCard({
         isWithinRadius(gps.lat, gps.lng, Number(loc.latitude), Number(loc.longitude), 500)
       )
       if (!match) {
-        // No location nearby — fall back to full check-in page
         router.push('/student/check-in?mode=qr')
         return
       }
@@ -107,7 +101,6 @@ export function CheckInHistoryCard({
         router.push('/student/check-in?mode=qr')
       }
     } catch {
-      // GPS unavailable or denied — fall back
       router.push('/student/check-in?mode=qr')
     } finally {
       setGpsLoading(false)
@@ -172,24 +165,12 @@ export function CheckInHistoryCard({
           </div>
         )}
 
-        {/* Recent check-ins */}
-        {recentCheckIns.length > 0 && (
-          <div className="border-t pt-3 space-y-2">
-            {recentCheckIns.slice(0, 3).map((ci) => (
-              <div key={ci.id} className="flex items-center justify-between text-sm">
-                <div>
-                  <p className="font-medium leading-tight">{ci.locations?.name ?? '—'}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(ci.check_in_time).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })}
-                  </p>
-                </div>
-                {ci.check_out_time
-                  ? <span className="text-xs text-green-600">Uit</span>
-                  : <span className="text-xs text-primary font-medium">Actief</span>}
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Mini 2-day history */}
+        <div className="border-t pt-3 space-y-2">
+          {recentDays.map((day) => (
+            <DayRow key={day.isoDate} day={day} compact />
+          ))}
+        </div>
 
         {/* History button — pushed to bottom */}
         <div className="mt-auto border-t pt-3">

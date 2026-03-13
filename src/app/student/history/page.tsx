@@ -42,11 +42,12 @@ export default async function HistoryPage({
   // Fetch approved schedules valid for this week
   const { data: schedules } = await supabase
     .from('schedules')
-    .select('day_of_week, start_time, end_time')
+    .select('day_of_week, start_time, end_time, valid_from, valid_until')
     .eq('user_id', user.id)
     .eq('status', 'approved')
     .lte('valid_from', sundayStr)
     .gte('valid_until', mondayStr)
+    .order('valid_from', { ascending: false })
 
   // Fetch approved leave requests for this week
   const { data: leaveRequests } = await supabase
@@ -63,7 +64,9 @@ export default async function HistoryPage({
     date.setDate(monday.getDate() + (dow - 1))
     const isoDate = toDateStr(date)
 
-    const scheduled = schedules?.find(s => s.day_of_week === dow) ?? null
+    const scheduled = schedules?.find(s =>
+      s.day_of_week === dow && s.valid_from <= isoDate && s.valid_until >= isoDate
+    ) ?? null
     const lr = leaveRequests?.find(lr => lr.date === isoDate) ?? null
     const approvedLeave = lr ? {
       hours_counted: lr.hours_counted,

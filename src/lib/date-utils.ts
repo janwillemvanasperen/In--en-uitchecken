@@ -69,6 +69,13 @@ export function formatTime(date: Date | string): string {
 }
 
 /**
+ * Format a Date as a local YYYY-MM-DD string (uses local timezone, not UTC)
+ */
+export function toLocalDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/**
  * Check if a date is today
  */
 export function isToday(date: Date | string): boolean {
