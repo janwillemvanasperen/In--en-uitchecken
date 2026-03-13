@@ -264,7 +264,7 @@ export function DayRow({ day, compact = false }: { day: DayData; compact?: boole
   }
 
   const content = (
-    <div className="py-3 space-y-2">
+    <div className="py-4 px-5 space-y-2">
         {/* Top row */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
