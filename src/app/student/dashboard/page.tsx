@@ -1,14 +1,10 @@
 // @ts-nocheck
 import { requireStudent } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import Link from 'next/link'
-import { CurrentStatusCard } from '@/components/student/current-status-card'
+import { CheckInHistoryCard } from '@/components/student/check-in-history-card'
 import { ProgressAndLeaveCard } from '@/components/student/progress-and-leave-card'
 import { WeekScheduleCard } from '@/components/student/week-schedule-card'
 import { getMonday } from '@/lib/date-utils'
-import { History } from 'lucide-react'
 
 export default async function StudentDashboard() {
   const user = await requireStudent()
@@ -70,71 +66,20 @@ export default async function StudentDashboard() {
     .limit(5)
 
   return (
-    <>
-      {/* Hero: Status + Check-in button (full width) */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-6">
-        <CurrentStatusCard
-          initialCheckIn={activeCheckIn}
-          userId={user.id}
-        />
-      </div>
-
-      {/* Info row: Progress & Leave + Week Schedule */}
-      <div className="grid gap-6 md:grid-cols-2 mb-6">
-        <ProgressAndLeaveCard
-          weeklyHours={weeklyHours || 0}
-          targetHours={scheduledWeeklyHours > 0 ? scheduledWeeklyHours : 16}
-          pendingCount={pendingLeave}
-          approvedCount={approvedLeave}
-          rejectedCount={rejectedLeave}
-        />
-        <WeekScheduleCard schedules={weekSchedules || []} />
-      </div>
-
-      {/* Recent check-ins */}
-      <Card className="mb-6">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">Recente check-ins</CardTitle>
-            <Link href="/student/history" className="text-xs text-primary hover:underline">
-              Alles bekijken
-            </Link>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {checkIns && checkIns.length > 0 ? (
-            <div className="space-y-3">
-              {checkIns.map((checkIn: any) => (
-                <div key={checkIn.id} className="flex items-center justify-between border-b pb-2 last:border-0">
-                  <div>
-                    <p className="font-medium text-sm">{checkIn.locations?.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(checkIn.check_in_time).toLocaleString('nl-NL')}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    {checkIn.check_out_time ? (
-                      <span className="text-xs text-green-600">Uitgecheckt</span>
-                    ) : (
-                      <span className="text-xs text-primary font-medium">Actief</span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Nog geen check-ins</p>
-          )}
-          <div className="mt-4 pt-3 border-t">
-            <Link href="/student/history">
-              <Button variant="outline" size="sm" className="w-full">
-                <History className="h-4 w-4 mr-2" />
-                Bekijk volledige geschiedenis
-              </Button>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
-    </>
+    <div className="grid gap-6 md:grid-cols-3">
+      <CheckInHistoryCard
+        initialCheckIn={activeCheckIn}
+        userId={user.id}
+        recentCheckIns={checkIns || []}
+      />
+      <ProgressAndLeaveCard
+        weeklyHours={weeklyHours || 0}
+        targetHours={scheduledWeeklyHours > 0 ? scheduledWeeklyHours : 16}
+        pendingCount={pendingLeave}
+        approvedCount={approvedLeave}
+        rejectedCount={rejectedLeave}
+      />
+      <WeekScheduleCard schedules={weekSchedules || []} />
+    </div>
   )
 }
