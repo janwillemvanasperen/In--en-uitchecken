@@ -316,9 +316,9 @@ export async function rejectLeaveRequest(id: string, adminNote?: string) {
 export async function createCoach(name: string) {
   try {
     await requireAdmin()
-    const supabase = await createClient()
+    const adminClient = createAdminClient()
 
-    const { error } = await supabase
+    const { error } = await adminClient
       .from('coaches')
       .insert({ name: name.trim() })
 
@@ -340,14 +340,14 @@ export async function createCoach(name: string) {
 export async function updateCoach(id: string, data: { name?: string; active?: boolean; user_id?: string | null }) {
   try {
     await requireAdmin()
-    const supabase = await createClient()
+    const adminClient = createAdminClient()
 
     const updateData: Record<string, any> = {}
     if (data.name !== undefined) updateData.name = data.name.trim()
     if (data.active !== undefined) updateData.active = data.active
     if ('user_id' in data) updateData.user_id = data.user_id || null
 
-    const { error } = await supabase
+    const { error } = await adminClient
       .from('coaches')
       .update(updateData)
       .eq('id', id)
@@ -369,9 +369,9 @@ export async function updateCoach(id: string, data: { name?: string; active?: bo
 export async function deleteCoach(id: string) {
   try {
     await requireAdmin()
-    const supabase = await createClient()
+    const adminClient = createAdminClient()
 
-    const { error } = await supabase
+    const { error } = await adminClient
       .from('coaches')
       .delete()
       .eq('id', id)
