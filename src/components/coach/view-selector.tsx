@@ -4,7 +4,8 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Users } from 'lucide-react'
 
-export type CoachView = 'mijn-studenten' | 'mijn-klas' | 'alle'
+import type { CoachView } from '@/lib/coach-utils'
+export type { CoachView }
 
 interface ViewSelectorProps {
   currentView: CoachView
@@ -47,8 +48,3 @@ export function ViewSelector({ currentView, counts }: ViewSelectorProps) {
   )
 }
 
-export function getCoachView(searchParams: { view?: string }): CoachView {
-  const v = searchParams?.view
-  if (v === 'mijn-klas' || v === 'alle') return v
-  return 'mijn-studenten'
-}

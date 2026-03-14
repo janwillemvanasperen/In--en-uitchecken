@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { NoteEditor } from '@/components/coach/note-editor'
-import { getCoachView } from '@/components/coach/view-selector'
+import { getCoachView } from '@/lib/coach-utils'
 import { ArrowLeft, Star, Clock, CalendarDays, FileText, CheckCircle2, XCircle, AlertTriangle, Briefcase } from 'lucide-react'
 import { getMonday, toLocalDateStr } from '@/lib/date-utils'
 

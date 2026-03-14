@@ -1,8 +1,8 @@
 // @ts-nocheck
 import { requireCoach } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import { ViewSelector, getCoachView } from '@/components/coach/view-selector'
-import { getStudentIdsForView } from '@/app/coach/actions'
+import { ViewSelector } from '@/components/coach/view-selector'
+import { getCoachView, getStudentIdsForView } from '@/lib/coach-utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'

@@ -1,9 +1,9 @@
 // @ts-nocheck
 import { requireCoach } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import { ViewSelector, getCoachView } from '@/components/coach/view-selector'
+import { ViewSelector } from '@/components/coach/view-selector'
 import { StudentCard } from '@/components/coach/student-card'
-import { getStudentIdsForView } from '@/app/coach/actions'
+import { getCoachView, getStudentIdsForView } from '@/lib/coach-utils'
 import { getMonday, toLocalDateStr } from '@/lib/date-utils'
 
 export const dynamic = 'force-dynamic'
