@@ -1,19 +1,20 @@
 // @ts-nocheck
 import { requireCoach } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { createAdminClient } from '@/lib/supabase/server'
 import { ViewSelector } from '@/components/coach/view-selector'
 import { getCoachView, getStudentIdsForView, getCoachEntityId } from '@/lib/coach-utils'
-import Link from 'next/link'
-import { Users, CheckCircle2, AlertTriangle, Clock, FileText, ArrowRight } from 'lucide-react'
 import { getMonday, toLocalDateStr } from '@/lib/date-utils'
+import { CoachDashboardTable } from '@/components/coach/coach-dashboard-table'
+import type { StudentGoalRow, GoalNameRow } from '@/components/coach/coach-dashboard-table'
+import { Card, CardContent } from '@/components/ui/card'
 
 export const dynamic = 'force-dynamic'
 
 export default async function CoachDashboard({ searchParams }: { searchParams: any }) {
   const user = await requireCoach()
   const supabase = await createClient()
+  const adminClient = createAdminClient()
   const view = getCoachView(searchParams)
 
   const today = new Date()
@@ -21,47 +22,58 @@ export default async function CoachDashboard({ searchParams }: { searchParams: a
   const todayStr = toLocalDateStr(today)
   const monday = getMonday(today)
   const mondayStr = toLocalDateStr(monday)
+  const mondayLastWeek = new Date(monday.getTime() - 7 * 24 * 3600 * 1000)
+  const mondayLastWeekStr = toLocalDateStr(mondayLastWeek)
+  const sundayLastWeekStr = toLocalDateStr(new Date(monday.getTime() - 1000))
 
-  // Get filtered student IDs + coach entity ID
   const [studentIds, coachEntityId] = await Promise.all([
     getStudentIdsForView(user.id, view),
     getCoachEntityId(user.id),
   ])
 
-  // Build base query helper
   const studentFilter = (q: any) =>
     studentIds === null ? q : studentIds.length === 0 ? q.in('id', ['__none__']) : q.in('id', studentIds)
 
-  // Fetch all students in view
-  const { data: allStudents } = await studentFilter(
-    supabase
-      .from('users')
-      .select('id, full_name, coach_id, class_code')
-      .eq('role', 'student')
-      .order('full_name')
-  )
-
-  const allStudentIds = (allStudents || []).map((s: any) => s.id)
-  const totalStudents = allStudentIds.length
-
-  // Count students per view for selector
-  const [{ data: allCount }, { data: myStudentsRaw }] = await Promise.all([
+  // Fetch students + count data for view selector
+  const [{ data: allStudents }, { data: allCount }, { data: myStudentsRaw }] = await Promise.all([
+    studentFilter(
+      supabase
+        .from('users')
+        .select('id, full_name, profile_photo_url, coach_id, class_code')
+        .eq('role', 'student')
+        .order('full_name')
+    ),
     supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'student'),
     coachEntityId
       ? supabase.from('users').select('id, coach_id, class_code').eq('role', 'student')
       : Promise.resolve({ data: [] }),
   ])
 
-  const myStudentCount = coachEntityId ? (myStudentsRaw || []).filter((u: any) => u.coach_id === coachEntityId).length : 0
-  const myClassCodes = Array.from(new Set((myStudentsRaw || []).filter((u: any) => u.coach_id === coachEntityId && u.class_code).map((u: any) => u.class_code as string)))
-  const myKlasCount = (myStudentsRaw || []).filter((u: any) => myClassCodes.includes(u.class_code)).length
+  const myStudentCount = coachEntityId
+    ? (myStudentsRaw || []).filter((u: any) => u.coach_id === coachEntityId).length
+    : 0
+  const myClassCodes = Array.from(
+    new Set(
+      (myStudentsRaw || [])
+        .filter((u: any) => u.coach_id === coachEntityId && u.class_code)
+        .map((u: any) => u.class_code as string)
+    )
+  )
+  const myKlasCount = (myStudentsRaw || []).filter((u: any) =>
+    myClassCodes.includes(u.class_code)
+  ).length
 
-  if (allStudentIds.length === 0) {
+  const allIds = (allStudents || []).map((s: any) => s.id)
+
+  if (allIds.length === 0) {
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold">Dashboard</h1>
-          <ViewSelector currentView={view} counts={{ mijnStudenten: myStudentCount, mijnKlas: myKlasCount, alle: allCount || 0 }} />
+          <ViewSelector
+            currentView={view}
+            counts={{ mijnStudenten: myStudentCount, mijnKlas: myKlasCount, alle: allCount || 0 }}
+          />
         </div>
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground text-sm">
@@ -72,25 +84,28 @@ export default async function CoachDashboard({ searchParams }: { searchParams: a
     )
   }
 
+  // Fetch all parallel data
   const [
     { data: activeCheckIns },
     { data: todaySchedules },
     { data: pendingLeave },
-    { data: recentCheckIns },
     { data: weekCheckIns },
-    { data: recentNotes },
+    { data: lastWeekCheckIns },
+    { data: devGoals },
+    { data: goalNames },
+    { data: coaches },
   ] = await Promise.all([
-    // Active check-ins now
+    // Who is checked in right now
     supabase
       .from('check_ins')
-      .select('user_id, check_in_time, locations!check_ins_location_id_fkey(name)')
-      .in('user_id', allStudentIds)
+      .select('user_id')
+      .in('user_id', allIds)
       .is('check_out_time', null),
     // Today's approved schedules
     supabase
       .from('schedules')
-      .select('user_id, start_time, end_time')
-      .in('user_id', allStudentIds)
+      .select('user_id')
+      .in('user_id', allIds)
       .eq('day_of_week', dayOfWeek)
       .eq('status', 'approved')
       .lte('valid_from', todayStr)
@@ -98,233 +113,115 @@ export default async function CoachDashboard({ searchParams }: { searchParams: a
     // Pending leave requests
     supabase
       .from('leave_requests')
-      .select('id, user_id, date, reason')
-      .in('user_id', allStudentIds)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false }),
-    // Recent check-ins (last 10)
-    supabase
-      .from('check_ins')
-      .select('id, user_id, check_in_time, check_out_time, locations!check_ins_location_id_fkey(name)')
-      .in('user_id', allStudentIds)
-      .order('check_in_time', { ascending: false })
-      .limit(10),
-    // This week's check-ins for hours calc
+      .select('user_id')
+      .in('user_id', allIds)
+      .eq('status', 'pending'),
+    // This week check-ins (completed)
     supabase
       .from('check_ins')
       .select('user_id, check_in_time, check_out_time')
-      .in('user_id', allStudentIds)
+      .in('user_id', allIds)
       .gte('check_in_time', mondayStr + 'T00:00:00')
       .not('check_out_time', 'is', null),
-    // Recent coach notes (last 5)
+    // Last week check-ins (completed)
     supabase
-      .from('coach_notes')
-      .select('id, student_id, note_text, created_at, users!coach_notes_student_id_fkey(full_name)')
-      .eq('coach_id', user.id)
-      .in('student_id', allStudentIds)
-      .order('created_at', { ascending: false })
-      .limit(5),
+      .from('check_ins')
+      .select('user_id, check_in_time, check_out_time')
+      .in('user_id', allIds)
+      .gte('check_in_time', mondayLastWeekStr + 'T00:00:00')
+      .lt('check_in_time', mondayStr + 'T00:00:00')
+      .not('check_out_time', 'is', null),
+    // Development goals
+    adminClient
+      .from('student_development_goals')
+      .select('student_id, goal_1_phase, goal_2_phase, goal_3_phase, goal_4_phase, goal_5_phase, goal_6_phase')
+      .in('student_id', allIds),
+    // Goal names
+    adminClient
+      .from('development_goal_names')
+      .select('goal_number, goal_name, description')
+      .eq('active', true)
+      .order('goal_number'),
+    // Coaches (for name lookup)
+    adminClient.from('coaches').select('id, name'),
   ])
 
-  const checkedInIds = new Set((activeCheckIns || []).map((ci: any) => ci.user_id))
-  const scheduledIds = new Set((todaySchedules || []).map((s: any) => s.user_id))
-  const checkedInCount = checkedInIds.size
-  const scheduledCount = scheduledIds.size
-  const notCheckedInExpected = [...scheduledIds].filter((id) => !checkedInIds.has(id)).length
+  // Build maps
+  const checkedInSet = new Set((activeCheckIns || []).map((ci: any) => ci.user_id))
+  const scheduledSet = new Set((todaySchedules || []).map((s: any) => s.user_id))
 
-  // Weekly hours per student
+  const pendingLeaveMap: Record<string, number> = {}
+  for (const lr of pendingLeave || []) {
+    pendingLeaveMap[lr.user_id] = (pendingLeaveMap[lr.user_id] || 0) + 1
+  }
+
   const weeklyHoursMap: Record<string, number> = {}
   for (const ci of weekCheckIns || []) {
-    if (ci.check_out_time) {
-      const h = (new Date(ci.check_out_time).getTime() - new Date(ci.check_in_time).getTime()) / 3600000
-      weeklyHoursMap[ci.user_id] = (weeklyHoursMap[ci.user_id] || 0) + h
-    }
+    const h = (new Date(ci.check_out_time).getTime() - new Date(ci.check_in_time).getTime()) / 3600000
+    weeklyHoursMap[ci.user_id] = (weeklyHoursMap[ci.user_id] || 0) + h
   }
-  const avgHours = totalStudents > 0
-    ? Object.values(weeklyHoursMap).reduce((a, b) => a + b, 0) / totalStudents
-    : 0
 
-  const studentMap = Object.fromEntries((allStudents || []).map((s: any) => [s.id, s]))
+  const lastWeekHoursMap: Record<string, number> = {}
+  for (const ci of lastWeekCheckIns || []) {
+    const h = (new Date(ci.check_out_time).getTime() - new Date(ci.check_in_time).getTime()) / 3600000
+    lastWeekHoursMap[ci.user_id] = (lastWeekHoursMap[ci.user_id] || 0) + h
+  }
 
-  const viewLabel = view === 'mijn-studenten' ? 'Mijn Studenten' : view === 'mijn-klas' ? 'Mijn Klas' : 'Alle Studenten'
+  const devGoalsMap: Record<string, any> = {}
+  for (const dg of devGoals || []) {
+    devGoalsMap[dg.student_id] = dg
+  }
+
+  const coachNameMap: Record<string, string> = {}
+  for (const c of coaches || []) {
+    coachNameMap[c.id] = c.name
+  }
+
+  // Build final goal names (fill missing with placeholders)
+  const finalGoalNames: GoalNameRow[] = Array.from({ length: 6 }, (_, i) => {
+    const found = (goalNames || []).find((gn: any) => gn.goal_number === i + 1)
+    return found
+      ? { goal_number: i + 1, goal_name: found.goal_name, description: found.description }
+      : { goal_number: i + 1, goal_name: `D${i + 1}`, description: null }
+  })
+
+  // Build table rows
+  const tableRows: StudentGoalRow[] = (allStudents || []).map((s: any) => {
+    const dg = devGoalsMap[s.id]
+    return {
+      id: s.id,
+      full_name: s.full_name,
+      profile_photo_url: s.profile_photo_url,
+      coach_name: s.coach_id ? coachNameMap[s.coach_id] || null : null,
+      class_code: s.class_code,
+      is_own_student: !!coachEntityId && s.coach_id === coachEntityId,
+      goal_phases: [
+        dg?.goal_1_phase ?? 0,
+        dg?.goal_2_phase ?? 0,
+        dg?.goal_3_phase ?? 0,
+        dg?.goal_4_phase ?? 0,
+        dg?.goal_5_phase ?? 0,
+        dg?.goal_6_phase ?? 0,
+      ],
+      hours_this_week: weeklyHoursMap[s.id] || 0,
+      hours_last_week: lastWeekHoursMap[s.id] || 0,
+      checked_in_today: checkedInSet.has(s.id),
+      has_schedule_today: scheduledSet.has(s.id),
+      pending_leave: pendingLeaveMap[s.id] || 0,
+    }
+  })
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="text-xl font-bold">Dashboard</h1>
-        <ViewSelector currentView={view} counts={{ mijnStudenten: myStudentCount, mijnKlas: myKlasCount, alle: allCount || 0 }} />
+        <ViewSelector
+          currentView={view}
+          counts={{ mijnStudenten: myStudentCount, mijnKlas: myKlasCount, alle: allCount || 0 }}
+        />
       </div>
 
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card>
-          <CardContent className="pt-4 pb-3">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-muted-foreground">Studenten</span>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <p className="text-2xl font-bold">{totalStudents}</p>
-            <p className="text-xs text-muted-foreground">{viewLabel}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-4 pb-3">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-muted-foreground">Ingecheckt nu</span>
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
-            </div>
-            <p className="text-2xl font-bold text-green-600">{checkedInCount}</p>
-            <p className="text-xs text-muted-foreground">van {scheduledCount} verwacht</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-4 pb-3">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-muted-foreground">Open verlof</span>
-              <AlertTriangle className="h-4 w-4 text-orange-500" />
-            </div>
-            <p className="text-2xl font-bold text-orange-500">{(pendingLeave || []).length}</p>
-            <p className="text-xs text-muted-foreground">aanvragen</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-4 pb-3">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-muted-foreground">Gem. uren/week</span>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <p className="text-2xl font-bold">{avgHours.toFixed(1)}</p>
-            <p className="text-xs text-muted-foreground">deze week</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-4">
-        {/* Vandaag overzicht */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center justify-between">
-              <span>Vandaag — {viewLabel}</span>
-              <Link href={`/coach/students?view=${view}`} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
-                Alle studenten <ArrowRight className="h-3 w-3" />
-              </Link>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1.5">
-            {notCheckedInExpected > 0 && (
-              <div className="flex items-center gap-2 p-2 rounded bg-orange-50 text-orange-700 text-sm">
-                <AlertTriangle className="h-4 w-4 shrink-0" />
-                {notCheckedInExpected} student{notCheckedInExpected !== 1 ? 'en' : ''} nog niet ingecheckt (verwacht vandaag)
-              </div>
-            )}
-            {checkedInCount === 0 && scheduledCount === 0 && (
-              <p className="text-sm text-muted-foreground py-2">Geen studenten verwacht vandaag.</p>
-            )}
-            {(activeCheckIns || []).slice(0, 5).map((ci: any) => {
-              const s = studentMap[ci.user_id]
-              return s ? (
-                <div key={ci.user_id} className="flex items-center justify-between text-sm py-1 border-b last:border-0">
-                  <Link href={`/coach/students/${ci.user_id}?view=${view}`} className="font-medium hover:underline">
-                    {s.full_name}
-                  </Link>
-                  <span className="text-xs text-green-600 flex items-center gap-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                    {ci.locations?.name}
-                  </span>
-                </div>
-              ) : null
-            })}
-          </CardContent>
-        </Card>
-
-        {/* Aandachtspunten */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Aandachtspunten</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {(pendingLeave || []).length === 0 && notCheckedInExpected === 0 ? (
-              <p className="text-sm text-muted-foreground">Geen aandachtspunten.</p>
-            ) : null}
-            {(pendingLeave || []).slice(0, 5).map((lr: any) => {
-              const s = studentMap[lr.user_id]
-              const reasonLabel = lr.reason === 'sick' ? 'Ziek' : lr.reason === 'late' ? 'Te laat' : 'Afspraak'
-              return s ? (
-                <Link key={lr.id} href={`/coach/students/${lr.user_id}?tab=verlof&view=${view}`} className="flex items-center justify-between p-2 rounded hover:bg-muted text-sm">
-                  <span className="font-medium">{s.full_name}</span>
-                  <Badge variant="outline" className="text-xs">{reasonLabel} · {new Date(lr.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}</Badge>
-                </Link>
-              ) : null
-            })}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recente activiteit */}
-      <div className="grid md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center justify-between">
-              <span>Recente check-ins</span>
-              <Link href={`/coach/students?view=${view}`} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
-                Meer <ArrowRight className="h-3 w-3" />
-              </Link>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-1">
-              {(recentCheckIns || []).slice(0, 6).map((ci: any) => {
-                const s = studentMap[ci.user_id]
-                const time = new Date(ci.check_in_time).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
-                const date = new Date(ci.check_in_time).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
-                return s ? (
-                  <div key={ci.id} className="flex items-center justify-between text-sm py-1 border-b last:border-0">
-                    <Link href={`/coach/students/${ci.user_id}?tab=aanwezigheid&view=${view}`} className="font-medium hover:underline truncate max-w-[140px]">
-                      {s.full_name}
-                    </Link>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      {date} {time}
-                      {!ci.check_out_time && <span className="text-green-600 ml-1">●</span>}
-                    </span>
-                  </div>
-                ) : null
-              })}
-              {(recentCheckIns || []).length === 0 && (
-                <p className="text-sm text-muted-foreground">Geen recente check-ins.</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center justify-between">
-              <span>Recente notities</span>
-              <Link href="/coach/notes" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
-                Alle <ArrowRight className="h-3 w-3" />
-              </Link>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {(recentNotes || []).length === 0 && (
-                <p className="text-sm text-muted-foreground">Geen recente notities.</p>
-              )}
-              {(recentNotes || []).map((note: any) => (
-                <Link key={note.id} href={`/coach/students/${note.student_id}?tab=notities&view=${view}`} className="block p-2 rounded hover:bg-muted">
-                  <p className="text-xs font-medium">{note.users?.full_name}</p>
-                  <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{note.note_text}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{new Date(note.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}</p>
-                </Link>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <CoachDashboardTable students={tableRows} goalNames={finalGoalNames} view={view} />
     </div>
   )
 }

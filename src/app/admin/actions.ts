@@ -390,6 +390,60 @@ export async function deleteCoach(id: string) {
   }
 }
 
+// ==================== DEVELOPMENT GOALS ====================
+
+export async function upsertStudentGoalPhases(
+  studentId: string,
+  phases: { goal_number: number; phase: number }[]
+) {
+  try {
+    await requireAdmin()
+    const adminClient = createAdminClient()
+
+    const updateData: Record<string, any> = { updated_at: new Date().toISOString() }
+    for (const { goal_number, phase } of phases) {
+      updateData[`goal_${goal_number}_phase`] = phase
+    }
+
+    const { error } = await adminClient
+      .from('student_development_goals')
+      .upsert({ student_id: studentId, ...updateData }, { onConflict: 'student_id' })
+
+    if (error) return { error: `Doelen bijwerken mislukt: ${error.message}` }
+
+    revalidatePath('/admin/development-goals')
+    revalidatePath('/coach/dashboard')
+    return { success: true }
+  } catch (error) {
+    console.error('Upsert student goals error:', error)
+    return { error: 'Er is een onverwachte fout opgetreden' }
+  }
+}
+
+export async function upsertGoalName(
+  goalNumber: number,
+  goalName: string,
+  description?: string
+) {
+  try {
+    await requireAdmin()
+    const adminClient = createAdminClient()
+
+    const { error } = await adminClient
+      .from('development_goal_names')
+      .upsert({ goal_number: goalNumber, goal_name: goalName.trim(), description: description?.trim() || null }, { onConflict: 'goal_number' })
+
+    if (error) return { error: `Doelnaam bijwerken mislukt: ${error.message}` }
+
+    revalidatePath('/admin/development-goals')
+    revalidatePath('/coach/dashboard')
+    return { success: true }
+  } catch (error) {
+    console.error('Upsert goal name error:', error)
+    return { error: 'Er is een onverwachte fout opgetreden' }
+  }
+}
+
 // ==================== SETTINGS ====================
 
 export async function updateSetting(key: string, value: string) {

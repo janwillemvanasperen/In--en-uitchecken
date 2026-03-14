@@ -263,6 +263,61 @@ export type Database = {
           updated_at?: string
         }
       }
+      development_goal_names: {
+        Row: {
+          goal_number: number
+          goal_name: string
+          description: string | null
+          active: boolean
+        }
+        Insert: {
+          goal_number: number
+          goal_name: string
+          description?: string | null
+          active?: boolean
+        }
+        Update: {
+          goal_number?: number
+          goal_name?: string
+          description?: string | null
+          active?: boolean
+        }
+      }
+      student_development_goals: {
+        Row: {
+          student_id: string
+          goal_1_phase: number
+          goal_2_phase: number
+          goal_3_phase: number
+          goal_4_phase: number
+          goal_5_phase: number
+          goal_6_phase: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          student_id: string
+          goal_1_phase?: number
+          goal_2_phase?: number
+          goal_3_phase?: number
+          goal_4_phase?: number
+          goal_5_phase?: number
+          goal_6_phase?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          student_id?: string
+          goal_1_phase?: number
+          goal_2_phase?: number
+          goal_3_phase?: number
+          goal_4_phase?: number
+          goal_5_phase?: number
+          goal_6_phase?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+      }
       check_ins: {
         Row: {
           id: string

@@ -4,8 +4,10 @@ import { createClient } from '@/lib/supabase/server'
 import { CheckInHistoryCard } from '@/components/student/check-in-history-card'
 import { ProgressAndLeaveCard } from '@/components/student/progress-and-leave-card'
 import { WeekScheduleCard } from '@/components/student/week-schedule-card'
+import { DevelopmentGoalsCard } from '@/components/student/development-goals-card'
 import { getMonday, toLocalDateStr } from '@/lib/date-utils'
 import type { DayData } from '@/components/student/week-history-view'
+import { createAdminClient } from '@/lib/supabase/server'
 
 export default async function StudentDashboard() {
   const user = await requireStudent()
@@ -122,6 +124,35 @@ export default async function StudentDashboard() {
     .from('locations')
     .select('*')
 
+  // Development goals (use admin client to bypass RLS)
+  const adminClient = createAdminClient()
+  const [{ data: devGoals }, { data: goalNames }] = await Promise.all([
+    adminClient
+      .from('student_development_goals')
+      .select('goal_1_phase, goal_2_phase, goal_3_phase, goal_4_phase, goal_5_phase, goal_6_phase')
+      .eq('student_id', user.id)
+      .single(),
+    adminClient
+      .from('development_goal_names')
+      .select('goal_number, goal_name, description')
+      .eq('active', true)
+      .order('goal_number'),
+  ])
+
+  const goalPhases: [number, number, number, number, number, number] = [
+    devGoals?.goal_1_phase ?? 0,
+    devGoals?.goal_2_phase ?? 0,
+    devGoals?.goal_3_phase ?? 0,
+    devGoals?.goal_4_phase ?? 0,
+    devGoals?.goal_5_phase ?? 0,
+    devGoals?.goal_6_phase ?? 0,
+  ]
+
+  const finalGoalNames = Array.from({ length: 6 }, (_, i) => {
+    const found = (goalNames || []).find((gn: any) => gn.goal_number === i + 1)
+    return found || { goal_number: i + 1, goal_name: `Doel ${i + 1}`, description: null }
+  })
+
   // Derive today's schedule
   const dayOfWeek = today.getDay() || 7
   const todaySchedule = (weekSchedules || []).find(s =>
@@ -172,6 +203,8 @@ export default async function StudentDashboard() {
           rejectedCount={rejectedLeave}
         />
       </div>
+
+      <DevelopmentGoalsCard goalPhases={goalPhases} goalNames={finalGoalNames} />
     </div>
   )
 }
