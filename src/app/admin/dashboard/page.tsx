@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import { Users, MapPin, Calendar, Clock, FileText, Settings, ClipboardCheck, GraduationCap, UserCheck, Target } from 'lucide-react'
+import { Users, MapPin, Calendar, Clock, FileText, Settings, ClipboardCheck, GraduationCap, UserCheck, Target, Tag } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,6 +48,7 @@ export default async function AdminDashboard() {
     { title: 'Verlofgoedkeuring', description: 'Keur verlofaanvragen goed of af', href: '/admin/leave-requests', icon: FileText, badge: pendingLeave },
     { title: 'Aanwezigheid', description: 'Bekijk check-ins en exporteer', href: '/admin/check-ins', icon: ClipboardCheck },
     { title: 'Ontwikkeldoelen', description: 'Beheer doelnamen en fases per student', href: '/admin/development-goals', icon: Target },
+    { title: 'Notitie labels', description: 'Beheer labels voor coach notities', href: '/admin/note-labels', icon: Tag },
     { title: 'Instellingen', description: 'Wijzig systeeminstellingen', href: '/admin/settings', icon: Settings },
   ]
 

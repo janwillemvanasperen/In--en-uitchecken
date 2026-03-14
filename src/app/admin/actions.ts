@@ -390,6 +390,56 @@ export async function deleteCoach(id: string) {
   }
 }
 
+// ==================== NOTE LABELS ====================
+
+export async function createNoteLabel(name: string, color: string, sortOrder: number) {
+  try {
+    await requireAdmin()
+    const adminClient = createAdminClient()
+    const { error } = await adminClient
+      .from('note_labels')
+      .insert({ name: name.trim(), color, sort_order: sortOrder })
+    if (error) {
+      if (error.code === '23505') return { error: 'Een label met deze naam bestaat al' }
+      return { error: error.message }
+    }
+    revalidatePath('/admin/note-labels')
+    return { success: true }
+  } catch (error) {
+    return { error: 'Er is een onverwachte fout opgetreden' }
+  }
+}
+
+export async function updateNoteLabel(
+  id: string,
+  data: { name?: string; color?: string; active?: boolean; sort_order?: number }
+) {
+  try {
+    await requireAdmin()
+    const adminClient = createAdminClient()
+    const { error } = await adminClient.from('note_labels').update(data).eq('id', id)
+    if (error) return { error: error.message }
+    revalidatePath('/admin/note-labels')
+    revalidatePath('/coach/notes')
+    return { success: true }
+  } catch (error) {
+    return { error: 'Er is een onverwachte fout opgetreden' }
+  }
+}
+
+export async function deleteNoteLabel(id: string) {
+  try {
+    await requireAdmin()
+    const adminClient = createAdminClient()
+    const { error } = await adminClient.from('note_labels').delete().eq('id', id)
+    if (error) return { error: error.message }
+    revalidatePath('/admin/note-labels')
+    return { success: true }
+  } catch (error) {
+    return { error: 'Er is een onverwachte fout opgetreden' }
+  }
+}
+
 // ==================== DEVELOPMENT GOALS ====================
 
 export async function upsertStudentGoalPhases(

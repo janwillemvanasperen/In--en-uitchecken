@@ -56,13 +56,17 @@ export default async function CoachStudentDetailPage({
     { data: myNotes },
     { data: colleagueNotes },
     { data: weekCheckIns },
+    { data: noteLabels },
+    { data: otherCoaches },
   ] = await Promise.all([
     adminClient.from('schedules').select('*').eq('user_id', params.id).order('valid_from', { ascending: false }),
     adminClient.from('check_ins').select('*, locations!check_ins_location_id_fkey(name)').eq('user_id', params.id).order('check_in_time', { ascending: false }).limit(50),
     adminClient.from('leave_requests').select('*').eq('user_id', params.id).order('date', { ascending: false }),
-    adminClient.from('coach_notes').select('*, users!coach_notes_coach_id_fkey(full_name)').eq('coach_id', coach.id).eq('student_id', params.id).order('created_at', { ascending: false }),
+    adminClient.from('coach_notes').select('*').eq('coach_id', coach.id).eq('student_id', params.id).order('created_at', { ascending: false }),
     adminClient.from('coach_notes').select('*, users!coach_notes_coach_id_fkey(full_name)').neq('coach_id', coach.id).eq('student_id', params.id).eq('visible_to_coaches', true).order('created_at', { ascending: false }),
     adminClient.from('check_ins').select('*').eq('user_id', params.id).gte('check_in_time', mondayStr + 'T00:00:00').not('check_out_time', 'is', null),
+    adminClient.from('note_labels').select('id, name, color').eq('active', true).order('sort_order'),
+    adminClient.from('users').select('id, full_name').contains('roles', ['coach']).neq('id', coach.id).order('full_name'),
   ])
 
   // Today's schedule
@@ -441,8 +445,10 @@ export default async function CoachStudentDetailPage({
         <NoteEditor
           studentId={params.id}
           currentCoachId={coach.id}
-          myNotes={(myNotes || []).map((n: any) => ({ ...n, coach: n.users }))}
+          myNotes={myNotes || []}
           colleagueNotes={(colleagueNotes || []).map((n: any) => ({ ...n, coach: n.users }))}
+          availableLabels={noteLabels || []}
+          availableCoaches={otherCoaches || []}
         />
       )}
 

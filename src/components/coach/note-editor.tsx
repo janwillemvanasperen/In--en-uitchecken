@@ -5,8 +5,23 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
-import { Loader2, Pencil, Trash2, Eye, EyeOff, Users } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import { Loader2, Pencil, Trash2, Eye, EyeOff, Users, Bell } from 'lucide-react'
 import { createNote, updateNote, deleteNote } from '@/app/coach/actions'
+
+export interface NoteLabel {
+  id: string
+  name: string
+  color: string
+}
+
+export interface CoachUser {
+  id: string
+  full_name: string
+}
 
 interface Note {
   id: string
@@ -14,6 +29,8 @@ interface Note {
   note_text: string
   visible_to_student: boolean
   visible_to_coaches: boolean
+  label_id?: string | null
+  label?: NoteLabel | null
   created_at: string
   updated_at: string
   coach?: { full_name: string } | null
@@ -24,29 +41,46 @@ interface NoteEditorProps {
   currentCoachId: string
   myNotes: Note[]
   colleagueNotes: Note[]
+  availableLabels?: NoteLabel[]
+  availableCoaches?: CoachUser[]
+}
+
+function LabelDot({ color }: { color: string }) {
+  return <span className="inline-block h-2 w-2 rounded-full shrink-0" style={{ background: color }} />
 }
 
 function NoteForm({
   studentId,
   initial,
+  availableLabels,
+  availableCoaches,
   onDone,
 }: {
   studentId: string
   initial?: Note
+  availableLabels: NoteLabel[]
+  availableCoaches: CoachUser[]
   onDone: () => void
 }) {
   const [text, setText] = useState(initial?.note_text ?? '')
   const [visibleToStudent, setVisibleToStudent] = useState(initial?.visible_to_student ?? false)
   const [visibleToCoaches, setVisibleToCoaches] = useState(initial?.visible_to_coaches ?? true)
+  const [labelId, setLabelId] = useState<string>(initial?.label_id ?? '__none__')
+  const [notifyIds, setNotifyIds] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const toggleNotify = (id: string) => {
+    setNotifyIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
 
   const handleSubmit = async () => {
     if (!text.trim()) return
     setLoading(true)
+    const lid = labelId === '__none__' ? null : labelId
     const result = initial
-      ? await updateNote(initial.id, text.trim(), visibleToStudent, visibleToCoaches)
-      : await createNote(studentId, text.trim(), visibleToStudent, visibleToCoaches)
+      ? await updateNote(initial.id, text.trim(), visibleToStudent, visibleToCoaches, lid)
+      : await createNote(studentId, text.trim(), visibleToStudent, visibleToCoaches, lid, notifyIds)
     setLoading(false)
     if (result.error) {
       setError(result.error)
@@ -57,6 +91,26 @@ function NoteForm({
 
   return (
     <div className="space-y-3 rounded-lg border p-4 bg-muted/30">
+      {/* Label selector */}
+      {availableLabels.length > 0 && (
+        <Select value={labelId} onValueChange={setLabelId}>
+          <SelectTrigger className="h-8 text-sm w-56">
+            <SelectValue placeholder="Label kiezen..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">Geen label</SelectItem>
+            {availableLabels.map(l => (
+              <SelectItem key={l.id} value={l.id}>
+                <div className="flex items-center gap-2">
+                  <LabelDot color={l.color} />
+                  {l.name}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+
       <Textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
@@ -64,6 +118,7 @@ function NoteForm({
         rows={4}
         className="resize-none"
       />
+
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
           <Checkbox
@@ -86,6 +141,30 @@ function NoteForm({
           </Label>
         </div>
       </div>
+
+      {/* Notify coaches (only on create) */}
+      {!initial && availableCoaches.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+            <Bell className="h-3 w-3" /> Coaches informeren
+          </p>
+          <div className="flex flex-wrap gap-3">
+            {availableCoaches.map(c => (
+              <div key={c.id} className="flex items-center gap-1.5">
+                <Checkbox
+                  id={`notify-${c.id}`}
+                  checked={notifyIds.includes(c.id)}
+                  onCheckedChange={() => toggleNotify(c.id)}
+                />
+                <Label htmlFor={`notify-${c.id}`} className="text-sm font-normal cursor-pointer">
+                  {c.full_name}
+                </Label>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {error && <p className="text-sm text-destructive">{error}</p>}
       <div className="flex gap-2">
         <Button
@@ -105,7 +184,15 @@ function NoteForm({
   )
 }
 
-function MyNoteCard({ note, studentId, currentCoachId }: { note: Note; studentId: string; currentCoachId: string }) {
+function MyNoteCard({
+  note,
+  studentId,
+  availableLabels,
+}: {
+  note: Note
+  studentId: string
+  availableLabels: NoteLabel[]
+}) {
   const [editing, setEditing] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -116,12 +203,28 @@ function MyNoteCard({ note, studentId, currentCoachId }: { note: Note; studentId
     setDeleting(false)
   }
 
+  const label = note.label ?? availableLabels.find(l => l.id === note.label_id) ?? null
+
   if (editing) {
-    return <NoteForm studentId={studentId} initial={note} onDone={() => setEditing(false)} />
+    return (
+      <NoteForm
+        studentId={studentId}
+        initial={note}
+        availableLabels={availableLabels}
+        availableCoaches={[]}
+        onDone={() => setEditing(false)}
+      />
+    )
   }
 
   return (
     <div className="rounded-lg border p-3 bg-background space-y-2">
+      {label && (
+        <div className="flex items-center gap-1.5">
+          <LabelDot color={label.color} />
+          <span className="text-xs font-medium" style={{ color: label.color }}>{label.name}</span>
+        </div>
+      )}
       <p className="text-sm whitespace-pre-wrap">{note.note_text}</p>
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -145,12 +248,18 @@ function MyNoteCard({ note, studentId, currentCoachId }: { note: Note; studentId
   )
 }
 
-export function NoteEditor({ studentId, currentCoachId, myNotes, colleagueNotes }: NoteEditorProps) {
+export function NoteEditor({
+  studentId,
+  currentCoachId,
+  myNotes,
+  colleagueNotes,
+  availableLabels = [],
+  availableCoaches = [],
+}: NoteEditorProps) {
   const [showForm, setShowForm] = useState(false)
 
   return (
     <div className="space-y-6">
-      {/* Add note button */}
       {!showForm && (
         <Button
           onClick={() => setShowForm(true)}
@@ -163,10 +272,14 @@ export function NoteEditor({ studentId, currentCoachId, myNotes, colleagueNotes 
       )}
 
       {showForm && (
-        <NoteForm studentId={studentId} onDone={() => setShowForm(false)} />
+        <NoteForm
+          studentId={studentId}
+          availableLabels={availableLabels}
+          availableCoaches={availableCoaches}
+          onDone={() => setShowForm(false)}
+        />
       )}
 
-      {/* My notes */}
       <div>
         <h3 className="text-sm font-semibold mb-3">Mijn Notities</h3>
         {myNotes.length === 0 ? (
@@ -174,27 +287,35 @@ export function NoteEditor({ studentId, currentCoachId, myNotes, colleagueNotes 
         ) : (
           <div className="space-y-2">
             {myNotes.map((note) => (
-              <MyNoteCard key={note.id} note={note} studentId={studentId} currentCoachId={currentCoachId} />
+              <MyNoteCard key={note.id} note={note} studentId={studentId} availableLabels={availableLabels} />
             ))}
           </div>
         )}
       </div>
 
-      {/* Colleague notes */}
       {colleagueNotes.length > 0 && (
         <div>
           <h3 className="text-sm font-semibold mb-3">Notities van Collega&apos;s</h3>
           <div className="space-y-2">
-            {colleagueNotes.map((note) => (
-              <div key={note.id} className="rounded-lg border p-3 bg-muted/20 space-y-2">
-                <p className="text-sm whitespace-pre-wrap">{note.note_text}</p>
-                <div className="text-xs text-muted-foreground flex items-center gap-2">
-                  <span className="font-medium">{note.coach?.full_name ?? 'Coach'}</span>
-                  <span>·</span>
-                  <span>{new Date(note.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+            {colleagueNotes.map((note) => {
+              const label = availableLabels.find(l => l.id === note.label_id) ?? null
+              return (
+                <div key={note.id} className="rounded-lg border p-3 bg-muted/20 space-y-2">
+                  {label && (
+                    <div className="flex items-center gap-1.5">
+                      <LabelDot color={label.color} />
+                      <span className="text-xs font-medium" style={{ color: label.color }}>{label.name}</span>
+                    </div>
+                  )}
+                  <p className="text-sm whitespace-pre-wrap">{note.note_text}</p>
+                  <div className="text-xs text-muted-foreground flex items-center gap-2">
+                    <span className="font-medium">{note.coach?.full_name ?? 'Coach'}</span>
+                    <span>·</span>
+                    <span>{new Date(note.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}

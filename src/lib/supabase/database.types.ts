@@ -84,6 +84,7 @@ export type Database = {
           note_text: string
           visible_to_student: boolean
           visible_to_coaches: boolean
+          label_id: string | null
           created_at: string
           updated_at: string
         }
@@ -94,6 +95,7 @@ export type Database = {
           note_text: string
           visible_to_student?: boolean
           visible_to_coaches?: boolean
+          label_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -104,8 +106,35 @@ export type Database = {
           note_text?: string
           visible_to_student?: boolean
           visible_to_coaches?: boolean
+          label_id?: string | null
           created_at?: string
           updated_at?: string
+        }
+      }
+      note_labels: {
+        Row: {
+          id: string
+          name: string
+          color: string
+          active: boolean
+          sort_order: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          color?: string
+          active?: boolean
+          sort_order?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          color?: string
+          active?: boolean
+          sort_order?: number
+          created_at?: string
         }
       }
       student_work_submissions: {
