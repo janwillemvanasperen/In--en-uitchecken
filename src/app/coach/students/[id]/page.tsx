@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { requireCoach } from '@/lib/auth'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { AvatarWithFallback } from '@/components/shared/avatar-with-fallback'
@@ -27,12 +27,13 @@ export default async function CoachStudentDetailPage({
 }) {
   const coach = await requireCoach()
   const supabase = await createClient()
+  const adminClient = createAdminClient()
   const view = getCoachView(searchParams)
   const activeTab = searchParams?.tab || 'overzicht'
 
   // Fetch student + coach entity
   const [{ data: student }, coachEntityId] = await Promise.all([
-    supabase.from('users').select('*').eq('id', params.id).eq('role', 'student').single(),
+    adminClient.from('users').select('*').eq('id', params.id).eq('role', 'student').single(),
     getCoachEntityId(coach.id),
   ])
 
@@ -47,7 +48,7 @@ export default async function CoachStudentDetailPage({
   const mondayStr = toLocalDateStr(monday)
   const sundayStr = toLocalDateStr(new Date(monday.getTime() + 6 * 86400000))
 
-  // Load data for all tabs at once (server components can do this efficiently)
+  // Load data for all tabs at once (admin client bypasses RLS so coaches can read student data)
   const [
     { data: allSchedules },
     { data: recentCheckIns },
@@ -56,12 +57,12 @@ export default async function CoachStudentDetailPage({
     { data: colleagueNotes },
     { data: weekCheckIns },
   ] = await Promise.all([
-    supabase.from('schedules').select('*').eq('user_id', params.id).order('valid_from', { ascending: false }),
-    supabase.from('check_ins').select('*, locations!check_ins_location_id_fkey(name)').eq('user_id', params.id).order('check_in_time', { ascending: false }).limit(50),
-    supabase.from('leave_requests').select('*').eq('user_id', params.id).order('date', { ascending: false }),
-    supabase.from('coach_notes').select('*, users!coach_notes_coach_id_fkey(full_name)').eq('coach_id', coach.id).eq('student_id', params.id).order('created_at', { ascending: false }),
-    supabase.from('coach_notes').select('*, users!coach_notes_coach_id_fkey(full_name)').neq('coach_id', coach.id).eq('student_id', params.id).eq('visible_to_coaches', true).order('created_at', { ascending: false }),
-    supabase.from('check_ins').select('*').eq('user_id', params.id).gte('check_in_time', mondayStr + 'T00:00:00').not('check_out_time', 'is', null),
+    adminClient.from('schedules').select('*').eq('user_id', params.id).order('valid_from', { ascending: false }),
+    adminClient.from('check_ins').select('*, locations!check_ins_location_id_fkey(name)').eq('user_id', params.id).order('check_in_time', { ascending: false }).limit(50),
+    adminClient.from('leave_requests').select('*').eq('user_id', params.id).order('date', { ascending: false }),
+    adminClient.from('coach_notes').select('*, users!coach_notes_coach_id_fkey(full_name)').eq('coach_id', coach.id).eq('student_id', params.id).order('created_at', { ascending: false }),
+    adminClient.from('coach_notes').select('*, users!coach_notes_coach_id_fkey(full_name)').neq('coach_id', coach.id).eq('student_id', params.id).eq('visible_to_coaches', true).order('created_at', { ascending: false }),
+    adminClient.from('check_ins').select('*').eq('user_id', params.id).gte('check_in_time', mondayStr + 'T00:00:00').not('check_out_time', 'is', null),
   ])
 
   // Today's schedule
@@ -70,7 +71,7 @@ export default async function CoachStudentDetailPage({
   )
 
   // Active check-in
-  const { data: activeCheckIn } = await supabase
+  const { data: activeCheckIn } = await adminClient
     .from('check_ins')
     .select('*, locations!check_ins_location_id_fkey(name)')
     .eq('user_id', params.id)
