@@ -183,7 +183,7 @@ export function NoteEditor({ studentId, currentCoachId, myNotes, colleagueNotes 
       {/* Colleague notes */}
       {colleagueNotes.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold mb-3">Notities van Collega's</h3>
+          <h3 className="text-sm font-semibold mb-3">Notities van Collega&apos;s</h3>
           <div className="space-y-2">
             {colleagueNotes.map((note) => (
               <div key={note.id} className="rounded-lg border p-3 bg-muted/20 space-y-2">

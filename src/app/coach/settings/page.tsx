@@ -26,7 +26,7 @@ export default async function CoachSettingsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
-          <p className="text-muted-foreground">De standaard weergave is "Mijn Studenten". Je kunt dit per sessie aanpassen via de weergave-selector bovenaan elke pagina.</p>
+          <p className="text-muted-foreground">De standaard weergave is &quot;Mijn Studenten&quot;. Je kunt dit per sessie aanpassen via de weergave-selector bovenaan elke pagina.</p>
         </CardContent>
       </Card>
 
