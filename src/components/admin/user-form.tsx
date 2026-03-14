@@ -33,6 +33,9 @@ export function UserForm({
   const [role, setRole] = useState<'student' | 'admin' | 'coach'>(user?.role || 'student')
   const [roles, setRoles] = useState<string[]>(user?.roles?.length ? user.roles : [user?.role || 'student'])
   const [coachId, setCoachId] = useState<string>(user?.coach_id || '__none__')
+  const [classCode, setClassCode] = useState<string>((user as any)?.class_code || '')
+  const [cohort, setCohort] = useState<string>((user as any)?.cohort || '')
+  const [phoneNumber, setPhoneNumber] = useState<string>((user as any)?.phone_number || '')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -76,8 +79,14 @@ export function UserForm({
     const selectedCoachId = coachId === '__none__' ? null : coachId
     const finalRoles = roles.includes(role) ? roles : [...roles, role]
 
+    const studentFields = role === 'student' ? {
+      class_code: classCode.trim() || null,
+      cohort: cohort.trim() || null,
+      phone_number: phoneNumber.trim() || null,
+    } : {}
+
     const result = isEditing
-      ? await updateUser(user.id, { full_name: fullName.trim(), email: email.trim(), role, roles: finalRoles, coach_id: selectedCoachId })
+      ? await updateUser(user.id, { full_name: fullName.trim(), email: email.trim(), role, roles: finalRoles, coach_id: selectedCoachId, ...studentFields })
       : await createUser({ full_name: fullName.trim(), email: email.trim(), password, role, roles: finalRoles, coach_id: selectedCoachId })
 
     if (result.error) {
@@ -90,6 +99,9 @@ export function UserForm({
         setRole('student')
         setRoles(['student'])
         setCoachId('__none__')
+        setClassCode('')
+        setCohort('')
+        setPhoneNumber('')
       }
       onDone?.()
     }
@@ -198,6 +210,40 @@ export function UserForm({
                 </SelectContent>
               </Select>
             </div>
+          )}
+          {role === 'student' && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="class-code">Klascode</Label>
+                  <Input
+                    id="class-code"
+                    value={classCode}
+                    onChange={(e) => setClassCode(e.target.value)}
+                    placeholder="bijv. MBO-2A"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="cohort">Cohort</Label>
+                  <Input
+                    id="cohort"
+                    value={cohort}
+                    onChange={(e) => setCohort(e.target.value)}
+                    placeholder="bijv. 2024-2025"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="phone-number">Telefoonnummer</Label>
+                <Input
+                  id="phone-number"
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="06-12345678"
+                />
+              </div>
+            </>
           )}
           <Button type="submit" disabled={isLoading} className="w-full">
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

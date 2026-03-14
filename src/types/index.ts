@@ -88,6 +88,9 @@ export type UpdateUserInput = {
   role?: 'student' | 'admin' | 'coach'
   roles?: string[]
   coach_id?: string | null
+  class_code?: string | null
+  cohort?: string | null
+  phone_number?: string | null
 }
 
 export type CreateLocationInput = {

@@ -54,6 +54,24 @@ export default async function ProfilePage() {
               <p className="font-medium">{coachName}</p>
             </div>
           )}
+          {(profile as any)?.class_code && (
+            <div>
+              <p className="text-sm text-muted-foreground">Klascode</p>
+              <p className="font-medium">{(profile as any).class_code}</p>
+            </div>
+          )}
+          {(profile as any)?.cohort && (
+            <div>
+              <p className="text-sm text-muted-foreground">Cohort</p>
+              <p className="font-medium">{(profile as any).cohort}</p>
+            </div>
+          )}
+          {(profile as any)?.phone_number && (
+            <div>
+              <p className="text-sm text-muted-foreground">Telefoonnummer</p>
+              <p className="font-medium">{(profile as any).phone_number}</p>
+            </div>
+          )}
           <div>
             <p className="text-sm text-muted-foreground">Account aangemaakt</p>
             <p className="font-medium">

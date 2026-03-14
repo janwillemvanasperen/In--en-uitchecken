@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { AvatarWithFallback } from '@/components/shared/avatar-with-fallback'
 import { uploadProfilePhoto } from '@/app/student/actions'
-import { Camera, Loader2 } from 'lucide-react'
+import { Camera, Upload, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 interface ProfilePhotoUploadProps {
@@ -60,6 +60,7 @@ export function ProfilePhotoUpload({ currentPhotoUrl, fullName }: ProfilePhotoUp
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -119,15 +120,35 @@ export function ProfilePhotoUpload({ currentPhotoUrl, fullName }: ProfilePhotoUp
         onChange={handleFileChange}
         className="hidden"
       />
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="user"
+        onChange={handleFileChange}
+        className="hidden"
+      />
 
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => fileInputRef.current?.click()}
-        disabled={loading}
-      >
-        {loading ? 'Uploaden...' : 'Foto wijzigen'}
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={loading}
+        >
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
+          {loading ? 'Uploaden...' : 'Bestand'}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => cameraInputRef.current?.click()}
+          disabled={loading}
+        >
+          <Camera className="h-4 w-4 mr-1" />
+          Camera
+        </Button>
+      </div>
 
       {error && (
         <p className="text-sm text-destructive">{error}</p>

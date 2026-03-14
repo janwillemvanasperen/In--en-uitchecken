@@ -62,6 +62,9 @@ export async function updateUser(userId: string, data: UpdateUserInput) {
     if (data.role) updateData.role = data.role
     if (data.roles) updateData.roles = data.roles
     if (data.coach_id !== undefined) updateData.coach_id = data.coach_id || null
+    if (data.class_code !== undefined) updateData.class_code = data.class_code || null
+    if (data.cohort !== undefined) updateData.cohort = data.cohort || null
+    if (data.phone_number !== undefined) updateData.phone_number = data.phone_number || null
 
     const { error } = await adminClient
       .from('users')
