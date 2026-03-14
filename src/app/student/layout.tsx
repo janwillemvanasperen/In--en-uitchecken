@@ -2,7 +2,6 @@
 import { requireStudent } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { StudentHeader } from '@/components/student/student-header'
-import { MobileBottomNav } from '@/components/student/mobile-bottom-nav'
 import { Breadcrumb } from '@/components/student/breadcrumb'
 
 export default async function StudentLayout({
@@ -32,7 +31,7 @@ export default async function StudentLayout({
   const unreadCount = (notifications || []).filter((n: any) => !n.read).length
 
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-0">
+    <div className="min-h-screen bg-background">
       <StudentHeader
         user={{
           id: user.id,
@@ -48,7 +47,6 @@ export default async function StudentLayout({
       <main className="container mx-auto px-4 py-6">
         {children}
       </main>
-      <MobileBottomNav />
     </div>
   )
 }
