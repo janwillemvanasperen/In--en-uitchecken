@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Loader2 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function LoginPage() {
@@ -39,7 +40,7 @@ export default function LoginPage() {
       if (userError) throw userError
       if (!userData) throw new Error('User data not found')
 
-      // Redirect based on role
+      // Redirect based on role — keep loading=true so spinner stays until navigation
       const userRole = (userData as { role: 'student' | 'admin' }).role
       if (userRole === 'admin') {
         router.push('/admin/dashboard')
@@ -49,7 +50,6 @@ export default function LoginPage() {
       router.refresh()
     } catch (err: any) {
       setError(err.message || 'Er is een fout opgetreden bij het inloggen')
-    } finally {
       setLoading(false)
     }
   }
@@ -96,7 +96,9 @@ export default function LoginPage() {
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Bezig met inloggen...' : 'Inloggen'}
+              {loading
+                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Bezig met inloggen…</>
+                : 'Inloggen'}
             </Button>
           </CardFooter>
         </form>

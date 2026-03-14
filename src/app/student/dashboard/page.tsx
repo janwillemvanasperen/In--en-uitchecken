@@ -136,6 +136,7 @@ export default async function StudentDashboard() {
         locations={locations || []}
         todaySchedule={todaySchedule}
       />
+      <WeekScheduleCard days={currentWeekDays} />
       <ProgressAndLeaveCard
         weeklyHours={weeklyHours || 0}
         targetHours={scheduledWeeklyHours > 0 ? scheduledWeeklyHours : 16}
@@ -143,7 +144,6 @@ export default async function StudentDashboard() {
         approvedCount={approvedLeave}
         rejectedCount={rejectedLeave}
       />
-      <WeekScheduleCard days={currentWeekDays} />
     </div>
   )
 }

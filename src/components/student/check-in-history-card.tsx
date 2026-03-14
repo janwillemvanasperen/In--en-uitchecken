@@ -94,6 +94,15 @@ export function CheckInHistoryCard({
       })
       if (result?.error) {
         router.push('/student/check-in?mode=qr')
+      } else if (result?.checkIn) {
+        // Immediately fetch check-in with location and update state
+        const client = createClient()
+        const { data } = await client
+          .from('check_ins')
+          .select('*, locations(*)')
+          .eq('id', (result.checkIn as any).id)
+          .single()
+        if (data) setActiveCheckIn(data as ActiveCheckIn)
       }
     } catch {
       router.push('/student/check-in?mode=qr')
@@ -105,7 +114,11 @@ export function CheckInHistoryCard({
   // Direct check-out
   function handleCheckOut() {
     startCheckOut(async () => {
-      await checkOut()
+      const result = await checkOut()
+      if (!result?.error) {
+        setActiveCheckIn(null)
+        setElapsedTime(0)
+      }
     })
   }
 
@@ -117,7 +130,7 @@ export function CheckInHistoryCard({
           Aanwezigheid
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col flex-1 gap-4">
+      <CardContent className="flex flex-col flex-1 gap-4 justify-center">
 
         {/* Check-in / Check-out */}
         {activeCheckIn ? (
