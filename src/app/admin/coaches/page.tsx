@@ -14,7 +14,7 @@ export default async function AdminCoachesPage() {
 
   const [{ data: coaches }, { data: coachUsers }, { data: studentUsers }] = await Promise.all([
     supabase.from('coaches').select('*').order('name'),
-    supabase.from('users').select('id, full_name').eq('role', 'coach').order('full_name'),
+    supabase.from('users').select('id, full_name').contains('roles', ['coach']).order('full_name'),
     supabase.from('users').select('coach_id').eq('role', 'student').not('coach_id', 'is', null),
   ])
 
