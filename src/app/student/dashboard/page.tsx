@@ -128,22 +128,50 @@ export default async function StudentDashboard() {
     s.day_of_week === dayOfWeek && s.valid_from <= todayStr && s.valid_until >= todayStr
   ) ?? null
 
+  // Coach notes visible to student
+  const { data: coachNotes } = await supabase
+    .from('coach_notes')
+    .select('id, note_text, created_at, users!coach_notes_coach_id_fkey(full_name)')
+    .eq('student_id', user.id)
+    .eq('visible_to_student', true)
+    .order('created_at', { ascending: false })
+    .limit(3)
+
   return (
-    <div className="grid gap-6 md:grid-cols-3">
-      <CheckInHistoryCard
-        initialCheckIn={activeCheckIn}
-        userId={user.id}
-        locations={locations || []}
-        todaySchedule={todaySchedule}
-      />
-      <WeekScheduleCard days={currentWeekDays} />
-      <ProgressAndLeaveCard
-        weeklyHours={weeklyHours || 0}
-        targetHours={scheduledWeeklyHours > 0 ? scheduledWeeklyHours : 16}
-        pendingCount={pendingLeave}
-        approvedCount={approvedLeave}
-        rejectedCount={rejectedLeave}
-      />
+    <div className="space-y-6">
+      {/* Coach notes banner */}
+      {(coachNotes || []).length > 0 && (
+        <div className="rounded-xl border border-[#ffd100]/40 bg-[#ffd100]/10 p-4">
+          <h2 className="text-sm font-semibold mb-3 text-[#b89900]">Berichten van je coach</h2>
+          <div className="space-y-2">
+            {(coachNotes || []).map((note: any) => (
+              <div key={note.id} className="bg-background/70 rounded-lg p-3">
+                <p className="text-sm">{note.note_text}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {note.users?.full_name} · {new Date(note.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="grid gap-6 md:grid-cols-3">
+        <CheckInHistoryCard
+          initialCheckIn={activeCheckIn}
+          userId={user.id}
+          locations={locations || []}
+          todaySchedule={todaySchedule}
+        />
+        <WeekScheduleCard days={currentWeekDays} />
+        <ProgressAndLeaveCard
+          weeklyHours={weeklyHours || 0}
+          targetHours={scheduledWeeklyHours > 0 ? scheduledWeeklyHours : 16}
+          pendingCount={pendingLeave}
+          approvedCount={approvedLeave}
+          rejectedCount={rejectedLeave}
+        />
+      </div>
     </div>
   )
 }

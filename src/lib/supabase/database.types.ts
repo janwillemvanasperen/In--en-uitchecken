@@ -18,6 +18,9 @@ export type Database = {
           full_name: string
           coach_id: string | null
           profile_photo_url: string | null
+          class_code: string | null
+          cohort: string | null
+          phone_number: string | null
           created_at: string
           updated_at: string
         }
@@ -29,6 +32,9 @@ export type Database = {
           full_name: string
           coach_id?: string | null
           profile_photo_url?: string | null
+          class_code?: string | null
+          cohort?: string | null
+          phone_number?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -40,6 +46,9 @@ export type Database = {
           full_name?: string
           coach_id?: string | null
           profile_photo_url?: string | null
+          class_code?: string | null
+          cohort?: string | null
+          phone_number?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -49,18 +58,135 @@ export type Database = {
           id: string
           name: string
           active: boolean
+          user_id: string | null
           created_at: string
         }
         Insert: {
           id?: string
           name: string
           active?: boolean
+          user_id?: string | null
           created_at?: string
         }
         Update: {
           id?: string
           name?: string
           active?: boolean
+          user_id?: string | null
+          created_at?: string
+        }
+      }
+      coach_notes: {
+        Row: {
+          id: string
+          coach_id: string
+          student_id: string
+          note_text: string
+          visible_to_student: boolean
+          visible_to_coaches: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          coach_id: string
+          student_id: string
+          note_text: string
+          visible_to_student?: boolean
+          visible_to_coaches?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          coach_id?: string
+          student_id?: string
+          note_text?: string
+          visible_to_student?: boolean
+          visible_to_coaches?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      student_work_submissions: {
+        Row: {
+          id: string
+          student_id: string
+          title: string
+          description: string | null
+          category: 'project' | 'opdracht' | 'oefening' | 'portfolio' | null
+          file_url: string
+          file_type: 'pdf' | 'image' | 'video' | 'document' | null
+          file_size: number | null
+          submitted_at: string
+          reviewed_by: string | null
+          reviewed_at: string | null
+          status: 'pending' | 'reviewed' | 'approved' | 'rejected'
+          coach_feedback: string | null
+          coach_rating: number | null
+          tags: string[]
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          student_id: string
+          title: string
+          description?: string | null
+          category?: 'project' | 'opdracht' | 'oefening' | 'portfolio' | null
+          file_url: string
+          file_type?: 'pdf' | 'image' | 'video' | 'document' | null
+          file_size?: number | null
+          submitted_at?: string
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          status?: 'pending' | 'reviewed' | 'approved' | 'rejected'
+          coach_feedback?: string | null
+          coach_rating?: number | null
+          tags?: string[]
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          student_id?: string
+          title?: string
+          description?: string | null
+          category?: 'project' | 'opdracht' | 'oefening' | 'portfolio' | null
+          file_url?: string
+          file_type?: 'pdf' | 'image' | 'video' | 'document' | null
+          file_size?: number | null
+          submitted_at?: string
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          status?: 'pending' | 'reviewed' | 'approved' | 'rejected'
+          coach_feedback?: string | null
+          coach_rating?: number | null
+          tags?: string[]
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      submission_comments: {
+        Row: {
+          id: string
+          submission_id: string
+          user_id: string
+          comment_text: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          submission_id: string
+          user_id: string
+          comment_text: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          submission_id?: string
+          user_id?: string
+          comment_text?: string
           created_at?: string
         }
       }
@@ -354,7 +480,7 @@ export type Database = {
       }
     }
     Enums: {
-      user_role: 'student' | 'admin'
+      user_role: 'student' | 'admin' | 'coach'
       schedule_status: 'pending' | 'approved' | 'rejected'
       leave_reason: 'sick' | 'late' | 'appointment'
       leave_status: 'pending' | 'approved' | 'rejected'
