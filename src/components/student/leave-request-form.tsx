@@ -44,7 +44,8 @@ function addMinutes(time: string, minutes: number): string {
 
 export function LeaveRequestForm({ schedules }: Props) {
   const router = useRouter()
-  const [date, setDate] = useState('')
+  const today = new Date().toISOString().split('T')[0]
+  const [date, setDate] = useState(today)
   const [reason, setReason] = useState<LeaveReason>('sick')
   const [description, setDescription] = useState('')
   // Afspraak: handmatige tijden
@@ -122,7 +123,7 @@ export function LeaveRequestForm({ schedules }: Props) {
       setError(result.error)
     } else {
       setSuccess(true)
-      setDate('')
+      setDate(new Date().toISOString().split('T')[0])
       setReason('sick')
       setDescription('')
       setFullDay(true)
