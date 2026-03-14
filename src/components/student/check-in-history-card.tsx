@@ -94,13 +94,13 @@ export function CheckInHistoryCard({
       })
       if (result?.error) {
         router.push('/student/check-in?mode=qr')
-      } else if (result?.checkIn) {
+      } else if ((result as any)?.checkIn) {
         // Immediately fetch check-in with location and update state
         const client = createClient()
         const { data } = await client
           .from('check_ins')
           .select('*, locations(*)')
-          .eq('id', (result.checkIn as any).id)
+          .eq('id', (result as any).checkIn.id)
           .single()
         if (data) setActiveCheckIn(data as ActiveCheckIn)
       }
