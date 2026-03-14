@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ViewSelector } from '@/components/coach/view-selector'
-import { getCoachView, getStudentIdsForView } from '@/lib/coach-utils'
+import { getCoachView, getStudentIdsForView, getCoachEntityId } from '@/lib/coach-utils'
 import Link from 'next/link'
 import { Users, CheckCircle2, AlertTriangle, Clock, FileText, ArrowRight } from 'lucide-react'
 import { getMonday, toLocalDateStr } from '@/lib/date-utils'
@@ -22,8 +22,11 @@ export default async function CoachDashboard({ searchParams }: { searchParams: a
   const monday = getMonday(today)
   const mondayStr = toLocalDateStr(monday)
 
-  // Get filtered student IDs
-  const studentIds = await getStudentIdsForView(user.id, view)
+  // Get filtered student IDs + coach entity ID
+  const [studentIds, coachEntityId] = await Promise.all([
+    getStudentIdsForView(user.id, view),
+    getCoachEntityId(user.id),
+  ])
 
   // Build base query helper
   const studentFilter = (q: any) =>
@@ -33,7 +36,7 @@ export default async function CoachDashboard({ searchParams }: { searchParams: a
   const { data: allStudents } = await studentFilter(
     supabase
       .from('users')
-      .select('id, full_name, coach_id, class_code, coaches!users_coach_id_fkey(name, user_id)')
+      .select('id, full_name, coach_id, class_code')
       .eq('role', 'student')
       .order('full_name')
   )
@@ -42,15 +45,16 @@ export default async function CoachDashboard({ searchParams }: { searchParams: a
   const totalStudents = allStudentIds.length
 
   // Count students per view for selector
-  const [{ data: allCount }, { data: myStudentsRaw }, { data: myKlasRaw }] = await Promise.all([
+  const [{ data: allCount }, { data: myStudentsRaw }] = await Promise.all([
     supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'student'),
-    supabase.from('users').select('id, coaches!users_coach_id_fkey(user_id)').eq('role', 'student'),
-    supabase.from('users').select('id, class_code, coaches!users_coach_id_fkey(user_id)').eq('role', 'student'),
+    coachEntityId
+      ? supabase.from('users').select('id, coach_id, class_code').eq('role', 'student')
+      : Promise.resolve({ data: [] }),
   ])
 
-  const myStudentCount = (myStudentsRaw || []).filter((u: any) => u.coaches?.user_id === user.id).length
-  const myClassCodes = Array.from(new Set((myStudentsRaw || []).filter((u: any) => u.coaches?.user_id === user.id && (u as any).class_code).map((u: any) => (u as any).class_code)))
-  const myKlasCount = (myKlasRaw || []).filter((u: any) => myClassCodes.includes(u.class_code)).length
+  const myStudentCount = coachEntityId ? (myStudentsRaw || []).filter((u: any) => u.coach_id === coachEntityId).length : 0
+  const myClassCodes = Array.from(new Set((myStudentsRaw || []).filter((u: any) => u.coach_id === coachEntityId && u.class_code).map((u: any) => u.class_code as string)))
+  const myKlasCount = (myStudentsRaw || []).filter((u: any) => myClassCodes.includes(u.class_code)).length
 
   if (allStudentIds.length === 0) {
     return (

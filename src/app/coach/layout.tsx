@@ -13,14 +13,18 @@ export default async function CoachLayout({ children }: { children: React.ReactN
     .eq('id', user.id)
     .single()
 
-  const { data: notifications } = await supabase
-    .from('notifications')
-    .select('id, read')
-    .eq('user_id', user.id)
-    .eq('read', false)
-    .limit(99)
-
-  const unreadCount = (notifications || []).length
+  let unreadCount = 0
+  try {
+    const { data: notifications } = await supabase
+      .from('notifications')
+      .select('id, read')
+      .eq('user_id', user.id)
+      .eq('read', false)
+      .limit(99)
+    unreadCount = (notifications || []).length
+  } catch {
+    // notifications table may not exist yet
+  }
 
   return (
     <CoachShell

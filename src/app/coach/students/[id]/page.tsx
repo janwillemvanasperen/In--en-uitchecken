@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { NoteEditor } from '@/components/coach/note-editor'
-import { getCoachView } from '@/lib/coach-utils'
+import { getCoachView, getCoachEntityId } from '@/lib/coach-utils'
 import { ArrowLeft, Star, Clock, CalendarDays, FileText, CheckCircle2, XCircle, AlertTriangle, Briefcase } from 'lucide-react'
 import { getMonday, toLocalDateStr } from '@/lib/date-utils'
 
@@ -30,17 +30,15 @@ export default async function CoachStudentDetailPage({
   const view = getCoachView(searchParams)
   const activeTab = searchParams?.tab || 'overzicht'
 
-  // Fetch student
-  const { data: student } = await supabase
-    .from('users')
-    .select('*, coaches!users_coach_id_fkey(name, user_id)')
-    .eq('id', params.id)
-    .eq('role', 'student')
-    .single()
+  // Fetch student + coach entity
+  const [{ data: student }, coachEntityId] = await Promise.all([
+    supabase.from('users').select('*').eq('id', params.id).eq('role', 'student').single(),
+    getCoachEntityId(coach.id),
+  ])
 
   if (!student) notFound()
 
-  const isOwnStudent = student.coaches?.user_id === coach.id
+  const isOwnStudent = !!coachEntityId && student.coach_id === coachEntityId
 
   const today = new Date()
   const dayOfWeek = today.getDay() || 7

@@ -2,7 +2,7 @@
 import { requireCoach } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { ViewSelector } from '@/components/coach/view-selector'
-import { getCoachView, getStudentIdsForView } from '@/lib/coach-utils'
+import { getCoachView, getStudentIdsForView, getCoachEntityId } from '@/lib/coach-utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
@@ -20,12 +20,15 @@ export default async function CoachComparePage({ searchParams }: { searchParams:
   const monday = getMonday(new Date())
   const mondayStr = toLocalDateStr(monday)
 
-  const studentIds = await getStudentIdsForView(user.id, view)
+  const [studentIds, coachEntityId] = await Promise.all([
+    getStudentIdsForView(user.id, view),
+    getCoachEntityId(user.id),
+  ])
   const studentFilter = (q: any) =>
     studentIds === null ? q : studentIds.length === 0 ? q.in('id', ['__none__']) : q.in('id', studentIds)
 
   const { data: students } = await studentFilter(
-    supabase.from('users').select('id, full_name, profile_photo_url, class_code, coaches!users_coach_id_fkey(name, user_id)').eq('role', 'student').order('full_name')
+    supabase.from('users').select('id, full_name, profile_photo_url, class_code, coach_id').eq('role', 'student').order('full_name')
   )
 
   const allIds = (students || []).map((s: any) => s.id)
@@ -85,7 +88,7 @@ export default async function CoachComparePage({ searchParams }: { searchParams:
             {sorted.map((student: any, index: number) => {
               const hours = weeklyHoursMap[student.id] || 0
               const pct = (hours / maxHours) * 100
-              const isOwn = student.coaches?.user_id === user.id
+              const isOwn = coachEntityId && student.coach_id === coachEntityId
               return (
                 <div key={student.id} className="space-y-1">
                   <div className="flex items-center gap-2">

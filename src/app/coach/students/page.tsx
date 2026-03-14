@@ -3,7 +3,7 @@ import { requireCoach } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { ViewSelector } from '@/components/coach/view-selector'
 import { StudentCard } from '@/components/coach/student-card'
-import { getCoachView, getStudentIdsForView } from '@/lib/coach-utils'
+import { getCoachView, getStudentIdsForView, getCoachEntityId } from '@/lib/coach-utils'
 import { getMonday, toLocalDateStr } from '@/lib/date-utils'
 
 export const dynamic = 'force-dynamic'
@@ -19,7 +19,10 @@ export default async function CoachStudentsPage({ searchParams }: { searchParams
   const monday = getMonday(today)
   const mondayStr = toLocalDateStr(monday)
 
-  const studentIds = await getStudentIdsForView(user.id, view)
+  const [studentIds, coachEntityId] = await Promise.all([
+    getStudentIdsForView(user.id, view),
+    getCoachEntityId(user.id),
+  ])
 
   const studentFilter = (q: any) =>
     studentIds === null ? q : studentIds.length === 0 ? q.in('id', ['__none__']) : q.in('id', studentIds)
@@ -27,7 +30,7 @@ export default async function CoachStudentsPage({ searchParams }: { searchParams
   const { data: students } = await studentFilter(
     supabase
       .from('users')
-      .select('id, full_name, profile_photo_url, class_code, cohort, coach_id, coaches!users_coach_id_fkey(name, user_id)')
+      .select('id, full_name, profile_photo_url, class_code, cohort, coach_id')
       .eq('role', 'student')
       .order('full_name')
   )
@@ -37,10 +40,12 @@ export default async function CoachStudentsPage({ searchParams }: { searchParams
   // Count data for view selector
   const [{ data: allRaw }, { data: myStudentsRaw }] = await Promise.all([
     supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'student'),
-    supabase.from('users').select('id, class_code, coaches!users_coach_id_fkey(user_id)').eq('role', 'student'),
+    coachEntityId
+      ? supabase.from('users').select('id, coach_id, class_code').eq('role', 'student')
+      : Promise.resolve({ data: [] }),
   ])
-  const myStudentCount = (myStudentsRaw || []).filter((u: any) => u.coaches?.user_id === user.id).length
-  const myClassCodes = Array.from(new Set((myStudentsRaw || []).filter((u: any) => u.coaches?.user_id === user.id && u.class_code).map((u: any) => u.class_code)))
+  const myStudentCount = coachEntityId ? (myStudentsRaw || []).filter((u: any) => u.coach_id === coachEntityId).length : 0
+  const myClassCodes = Array.from(new Set((myStudentsRaw || []).filter((u: any) => u.coach_id === coachEntityId && u.class_code).map((u: any) => u.class_code as string)))
   const myKlasCount = (myStudentsRaw || []).filter((u: any) => myClassCodes.includes(u.class_code)).length
 
   if (allIds.length === 0) {
@@ -102,7 +107,7 @@ export default async function CoachStudentsPage({ searchParams }: { searchParams
           <StudentCard
             key={student.id}
             student={student}
-            isOwnStudent={student.coaches?.user_id === user.id}
+            isOwnStudent={!!coachEntityId && student.coach_id === coachEntityId}
             isCheckedIn={!!checkInMap[student.id]}
             checkInTime={checkInMap[student.id]?.time}
             checkInLocation={checkInMap[student.id]?.location}
