@@ -14,20 +14,26 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Loader2, Trash2, Pencil, Plus, Users, Power } from 'lucide-react'
 import { createCoach, updateCoach, deleteCoach } from '@/app/admin/actions'
 import type { Coach } from '@/types'
 
+type CoachUser = { id: string; full_name: string }
+
 export function CoachList({
   coaches,
   studentCounts,
+  coachUsers,
 }: {
   coaches: Coach[]
   studentCounts: Record<string, number>
+  coachUsers: CoachUser[]
 }) {
   const [newName, setNewName] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
+  const [editUserId, setEditUserId] = useState<string>('')
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -52,12 +58,16 @@ export function CoachList({
     setIsLoading(true)
     setError(null)
 
-    const result = await updateCoach(id, { name: editName })
+    const result = await updateCoach(id, {
+      name: editName,
+      user_id: editUserId === '__none__' ? null : editUserId || null,
+    })
     if (result.error) {
       setError(result.error)
     } else {
       setEditingId(null)
       setEditName('')
+      setEditUserId('')
     }
     setIsLoading(false)
   }
@@ -87,6 +97,7 @@ export function CoachList({
   const startEdit = (coach: Coach) => {
     setEditingId(coach.id)
     setEditName(coach.name)
+    setEditUserId((coach as any).user_id || '__none__')
   }
 
   const deletingCoach = coaches.find((c) => c.id === deletingId)
@@ -139,6 +150,7 @@ export function CoachList({
             <thead className="bg-muted">
               <tr>
                 <th className="text-left px-4 py-3 font-medium">Naam</th>
+                <th className="text-left px-4 py-3 font-medium">Account</th>
                 <th className="text-left px-4 py-3 font-medium">Studenten</th>
                 <th className="text-left px-4 py-3 font-medium">Status</th>
                 <th className="text-right px-4 py-3 font-medium">Acties</th>
@@ -148,14 +160,27 @@ export function CoachList({
               {coaches.map((coach) => (
                 <tr key={coach.id}>
                   {editingId === coach.id ? (
-                    <td colSpan={4} className="px-4 py-3">
-                      <div className="flex gap-2">
+                    <td colSpan={5} className="px-4 py-3">
+                      <div className="flex gap-2 flex-wrap">
                         <Input
                           value={editName}
                           onChange={(e) => setEditName(e.target.value)}
                           disabled={isLoading}
                           autoFocus
+                          placeholder="Naam"
+                          className="flex-1 min-w-32"
                         />
+                        <Select value={editUserId} onValueChange={setEditUserId}>
+                          <SelectTrigger className="flex-1 min-w-48">
+                            <SelectValue placeholder="Kies account..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">— Geen account —</SelectItem>
+                            {coachUsers.map((u) => (
+                              <SelectItem key={u.id} value={u.id}>{u.full_name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <Button
                           size="sm"
                           onClick={() => handleUpdate(coach.id)}
@@ -175,6 +200,11 @@ export function CoachList({
                   ) : (
                     <>
                       <td className="px-4 py-3 font-medium">{coach.name}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">
+                        {(coach as any).user_id
+                          ? (coachUsers.find((u) => u.id === (coach as any).user_id)?.full_name ?? <span className="italic">Onbekend</span>)
+                          : <span className="italic">Niet gekoppeld</span>}
+                      </td>
                       <td className="px-4 py-3">
                         <span className="flex items-center gap-1 text-muted-foreground">
                           <Users className="h-3 w-3" />

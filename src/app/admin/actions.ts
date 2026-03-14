@@ -337,7 +337,7 @@ export async function createCoach(name: string) {
   }
 }
 
-export async function updateCoach(id: string, data: { name?: string; active?: boolean }) {
+export async function updateCoach(id: string, data: { name?: string; active?: boolean; user_id?: string | null }) {
   try {
     await requireAdmin()
     const supabase = await createClient()
@@ -345,6 +345,7 @@ export async function updateCoach(id: string, data: { name?: string; active?: bo
     const updateData: Record<string, any> = {}
     if (data.name !== undefined) updateData.name = data.name.trim()
     if (data.active !== undefined) updateData.active = data.active
+    if ('user_id' in data) updateData.user_id = data.user_id || null
 
     const { error } = await supabase
       .from('coaches')

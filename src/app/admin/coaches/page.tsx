@@ -12,20 +12,14 @@ export default async function AdminCoachesPage() {
   await requireAdmin()
   const supabase = await createClient()
 
-  const { data: coaches } = await supabase
-    .from('coaches')
-    .select('*')
-    .order('name')
-
-  // Count students per coach
-  const { data: users } = await supabase
-    .from('users')
-    .select('coach_id')
-    .eq('role', 'student')
-    .not('coach_id', 'is', null)
+  const [{ data: coaches }, { data: coachUsers }, { data: studentUsers }] = await Promise.all([
+    supabase.from('coaches').select('*').order('name'),
+    supabase.from('users').select('id, full_name').eq('role', 'coach').order('full_name'),
+    supabase.from('users').select('coach_id').eq('role', 'student').not('coach_id', 'is', null),
+  ])
 
   const studentCounts: Record<string, number> = {}
-  for (const u of users || []) {
+  for (const u of studentUsers || []) {
     if (u.coach_id) {
       studentCounts[u.coach_id] = (studentCounts[u.coach_id] || 0) + 1
     }
@@ -46,7 +40,7 @@ export default async function AdminCoachesPage() {
       </header>
 
       <main className="container mx-auto px-4 py-8 max-w-4xl">
-        <CoachList coaches={coaches || []} studentCounts={studentCounts} />
+        <CoachList coaches={coaches || []} studentCounts={studentCounts} coachUsers={coachUsers || []} />
       </main>
 </>
   )
