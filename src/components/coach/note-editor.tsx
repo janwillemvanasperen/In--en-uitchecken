@@ -9,8 +9,27 @@ import { Badge } from '@/components/ui/badge'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { Loader2, Pencil, Trash2, Eye, EyeOff, Users, Bell } from 'lucide-react'
+import { Loader2, Pencil, Trash2, Eye, EyeOff, Users, Bell, X } from 'lucide-react'
 import { createNote, updateNote, deleteNote } from '@/app/coach/actions'
+
+const PERIOD_OPTIONS = [
+  { value: 'all',       label: 'Alle periodes' },
+  { value: 'today',     label: 'Vandaag' },
+  { value: 'this_week', label: 'Deze week' },
+  { value: 'this_month',label: 'Deze maand' },
+  { value: 'this_year', label: 'Dit jaar' },
+]
+
+function periodStart(period: string): Date | null {
+  const now = new Date()
+  if (period === 'today') return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  if (period === 'this_week') {
+    const d = new Date(now); const day = d.getDay() || 7; d.setDate(d.getDate() - day + 1); d.setHours(0,0,0,0); return d
+  }
+  if (period === 'this_month') return new Date(now.getFullYear(), now.getMonth(), 1)
+  if (period === 'this_year') return new Date(now.getFullYear(), 0, 1)
+  return null
+}
 
 export interface NoteLabel {
   id: string
@@ -257,9 +276,29 @@ export function NoteEditor({
   availableCoaches = [],
 }: NoteEditorProps) {
   const [showForm, setShowForm] = useState(false)
+  const [labelFilter, setLabelFilter] = useState('all')
+  const [sourceFilter, setSourceFilter] = useState('all') // 'all' | 'mine' | 'colleagues'
+  const [periodFilter, setPeriodFilter] = useState('all')
+
+  const hasFilters = labelFilter !== 'all' || sourceFilter !== 'all' || periodFilter !== 'all'
+
+  const filterNote = (note: Note) => {
+    if (labelFilter !== 'all') {
+      if (labelFilter === '__none__' && note.label_id) return false
+      if (labelFilter !== '__none__' && note.label_id !== labelFilter) return false
+    }
+    const since = periodStart(periodFilter)
+    if (since && new Date(note.created_at) < since) return false
+    return true
+  }
+
+  const visibleMyNotes = sourceFilter === 'colleagues' ? [] : myNotes.filter(filterNote)
+  const visibleColleagueNotes = sourceFilter === 'mine' ? [] : colleagueNotes.filter(filterNote)
+  const totalVisible = visibleMyNotes.length + visibleColleagueNotes.length
+  const totalAll = myNotes.length + colleagueNotes.length
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {!showForm && (
         <Button
           onClick={() => setShowForm(true)}
@@ -280,43 +319,113 @@ export function NoteEditor({
         />
       )}
 
-      <div>
-        <h3 className="text-sm font-semibold mb-3">Mijn Notities</h3>
-        {myNotes.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nog geen notities.</p>
-        ) : (
-          <div className="space-y-2">
-            {myNotes.map((note) => (
-              <MyNoteCard key={note.id} note={note} studentId={studentId} availableLabels={availableLabels} />
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Filters */}
+      {totalAll > 0 && (
+        <div className="flex flex-wrap gap-2 items-center border rounded-lg px-3 py-2 bg-muted/20">
+          {availableLabels.length > 0 && (
+            <Select value={labelFilter} onValueChange={setLabelFilter}>
+              <SelectTrigger className="h-7 text-xs w-40 bg-background">
+                <SelectValue placeholder="Label" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle labels</SelectItem>
+                <SelectItem value="__none__">Geen label</SelectItem>
+                {availableLabels.map(l => (
+                  <SelectItem key={l.id} value={l.id}>
+                    <div className="flex items-center gap-2">
+                      <LabelDot color={l.color} />
+                      {l.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {colleagueNotes.length > 0 && (
+            <Select value={sourceFilter} onValueChange={setSourceFilter}>
+              <SelectTrigger className="h-7 text-xs w-36 bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle coaches</SelectItem>
+                <SelectItem value="mine">Alleen mijn notities</SelectItem>
+                <SelectItem value="colleagues">Alleen collega&apos;s</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+          <Select value={periodFilter} onValueChange={setPeriodFilter}>
+            <SelectTrigger className="h-7 text-xs w-36 bg-background">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PERIOD_OPTIONS.map(o => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {hasFilters && (
+            <button
+              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5"
+              onClick={() => { setLabelFilter('all'); setSourceFilter('all'); setPeriodFilter('all') }}
+            >
+              <X className="h-3 w-3" /> Wis
+            </button>
+          )}
+          {hasFilters && (
+            <span className="ml-auto text-xs text-muted-foreground">
+              {totalVisible} van {totalAll}
+            </span>
+          )}
+        </div>
+      )}
 
-      {colleagueNotes.length > 0 && (
+      {/* My notes */}
+      {sourceFilter !== 'colleagues' && (
+        <div>
+          <h3 className="text-sm font-semibold mb-3">Mijn Notities</h3>
+          {visibleMyNotes.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {hasFilters ? 'Geen notities voor deze filters.' : 'Nog geen notities.'}
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {visibleMyNotes.map((note) => (
+                <MyNoteCard key={note.id} note={note} studentId={studentId} availableLabels={availableLabels} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Colleague notes */}
+      {sourceFilter !== 'mine' && colleagueNotes.length > 0 && (
         <div>
           <h3 className="text-sm font-semibold mb-3">Notities van Collega&apos;s</h3>
-          <div className="space-y-2">
-            {colleagueNotes.map((note) => {
-              const label = availableLabels.find(l => l.id === note.label_id) ?? null
-              return (
-                <div key={note.id} className="rounded-lg border p-3 bg-muted/20 space-y-2">
-                  {label && (
-                    <div className="flex items-center gap-1.5">
-                      <LabelDot color={label.color} />
-                      <span className="text-xs font-medium" style={{ color: label.color }}>{label.name}</span>
+          {visibleColleagueNotes.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Geen notities voor deze filters.</p>
+          ) : (
+            <div className="space-y-2">
+              {visibleColleagueNotes.map((note) => {
+                const label = availableLabels.find(l => l.id === note.label_id) ?? null
+                return (
+                  <div key={note.id} className="rounded-lg border p-3 bg-muted/20 space-y-2">
+                    {label && (
+                      <div className="flex items-center gap-1.5">
+                        <LabelDot color={label.color} />
+                        <span className="text-xs font-medium" style={{ color: label.color }}>{label.name}</span>
+                      </div>
+                    )}
+                    <p className="text-sm whitespace-pre-wrap">{note.note_text}</p>
+                    <div className="text-xs text-muted-foreground flex items-center gap-2">
+                      <span className="font-medium">{note.coach?.full_name ?? 'Coach'}</span>
+                      <span>·</span>
+                      <span>{new Date(note.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                     </div>
-                  )}
-                  <p className="text-sm whitespace-pre-wrap">{note.note_text}</p>
-                  <div className="text-xs text-muted-foreground flex items-center gap-2">
-                    <span className="font-medium">{note.coach?.full_name ?? 'Coach'}</span>
-                    <span>·</span>
-                    <span>{new Date(note.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                   </div>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>
