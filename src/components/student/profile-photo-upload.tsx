@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Button } from '@/components/ui/button'
 import { AvatarWithFallback } from '@/components/shared/avatar-with-fallback'
 import { uploadProfilePhoto } from '@/app/student/actions'
 import { Camera, Upload, Loader2 } from 'lucide-react'
@@ -59,6 +58,7 @@ export function ProfilePhotoUpload({ currentPhotoUrl, fullName }: ProfilePhotoUp
   const [photoUrl, setPhotoUrl] = useState(currentPhotoUrl)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
@@ -101,7 +101,7 @@ export function ProfilePhotoUpload({ currentPhotoUrl, fullName }: ProfilePhotoUp
           size="lg"
         />
         <button
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => !loading && setMenuOpen((o) => !o)}
           disabled={loading}
           className="absolute bottom-0 right-0 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md hover:bg-primary/90 transition-colors"
         >
@@ -111,6 +111,25 @@ export function ProfilePhotoUpload({ currentPhotoUrl, fullName }: ProfilePhotoUp
             <Camera className="h-4 w-4" />
           )}
         </button>
+
+        {menuOpen && !loading && (
+          <div className="absolute bottom-10 right-0 z-10 bg-background border rounded-lg shadow-lg py-1 min-w-[140px]">
+            <button
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors"
+              onClick={() => { setMenuOpen(false); fileInputRef.current?.click() }}
+            >
+              <Upload className="h-4 w-4" />
+              Bestand kiezen
+            </button>
+            <button
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors"
+              onClick={() => { setMenuOpen(false); cameraInputRef.current?.click() }}
+            >
+              <Camera className="h-4 w-4" />
+              Camera gebruiken
+            </button>
+          </div>
+        )}
       </div>
 
       <input
@@ -128,27 +147,6 @@ export function ProfilePhotoUpload({ currentPhotoUrl, fullName }: ProfilePhotoUp
         onChange={handleFileChange}
         className="hidden"
       />
-
-      <div className="flex gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={loading}
-        >
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
-          {loading ? 'Uploaden...' : 'Bestand'}
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => cameraInputRef.current?.click()}
-          disabled={loading}
-        >
-          <Camera className="h-4 w-4 mr-1" />
-          Camera
-        </Button>
-      </div>
 
       {error && (
         <p className="text-sm text-destructive">{error}</p>
