@@ -35,7 +35,8 @@ export function RoleSwitcher({ currentRole, availableRoles }: RoleSwitcherProps)
     startTransition(async () => {
       const result = await switchRole(role)
       if (result?.redirectTo) {
-        router.push(result.redirectTo)
+        // Full page reload to bypass Next.js server component cache
+        window.location.href = result.redirectTo
       }
     })
   }
