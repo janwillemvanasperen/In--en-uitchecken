@@ -1,7 +1,11 @@
+'use client'
+
+import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { formatDate } from '@/lib/date-utils'
-import { Calendar, Clock, FileText, MessageSquare } from 'lucide-react'
+import { Calendar, Clock, FileText, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react'
 import type { LeaveRequest, LeaveReason, LeaveStatus } from '@/types'
 
 interface LeaveRequestsListProps {
@@ -23,7 +27,12 @@ const STATUS_CONFIG: Record<
   rejected: { variant: 'destructive', label: 'Afgewezen' },
 }
 
+const PREVIEW_COUNT = 2
+
 export function LeaveRequestsList({ requests }: LeaveRequestsListProps) {
+  const [showAll, setShowAll] = useState(false)
+  const visible = showAll ? requests : requests.slice(0, PREVIEW_COUNT)
+
   return (
     <Card>
       <CardHeader>
@@ -39,7 +48,7 @@ export function LeaveRequestsList({ requests }: LeaveRequestsListProps) {
           </p>
         ) : (
           <div className="space-y-3">
-            {requests.map((request) => {
+            {visible.map((request) => {
               const statusConfig = STATUS_CONFIG[request.status]
 
               return (
@@ -93,6 +102,18 @@ export function LeaveRequestsList({ requests }: LeaveRequestsListProps) {
                 </div>
               )
             })}
+            {requests.length > PREVIEW_COUNT && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full text-muted-foreground"
+                onClick={() => setShowAll(!showAll)}
+              >
+                {showAll
+                  ? <><ChevronUp className="h-4 w-4 mr-1" />Minder tonen</>
+                  : <><ChevronDown className="h-4 w-4 mr-1" />Alle {requests.length} aanvragen tonen</>}
+              </Button>
+            )}
           </div>
         )}
       </CardContent>
