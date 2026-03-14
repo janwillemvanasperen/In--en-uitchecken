@@ -36,13 +36,13 @@ export async function getStudentIdsForView(
   }
 
   if (view === 'mijn-klas') {
-    const myClassCodes = [
-      ...new Set(
+    const myClassCodes = Array.from(
+      new Set(
         students
           .filter((u: any) => u.coaches?.user_id === coachUserId && u.class_code)
           .map((u: any) => u.class_code as string)
-      ),
-    ]
+      )
+    )
     if (myClassCodes.length === 0) return []
     return students
       .filter((u: any) => myClassCodes.includes(u.class_code))

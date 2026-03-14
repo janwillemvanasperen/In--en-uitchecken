@@ -49,7 +49,7 @@ export default async function CoachDashboard({ searchParams }: { searchParams: a
   ])
 
   const myStudentCount = (myStudentsRaw || []).filter((u: any) => u.coaches?.user_id === user.id).length
-  const myClassCodes = [...new Set((myStudentsRaw || []).filter((u: any) => u.coaches?.user_id === user.id && (u as any).class_code).map((u: any) => (u as any).class_code))]
+  const myClassCodes = Array.from(new Set((myStudentsRaw || []).filter((u: any) => u.coaches?.user_id === user.id && (u as any).class_code).map((u: any) => (u as any).class_code)))
   const myKlasCount = (myKlasRaw || []).filter((u: any) => myClassCodes.includes(u.class_code)).length
 
   if (allStudentIds.length === 0) {

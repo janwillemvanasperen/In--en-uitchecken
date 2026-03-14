@@ -40,7 +40,7 @@ export default async function CoachStudentsPage({ searchParams }: { searchParams
     supabase.from('users').select('id, class_code, coaches!users_coach_id_fkey(user_id)').eq('role', 'student'),
   ])
   const myStudentCount = (myStudentsRaw || []).filter((u: any) => u.coaches?.user_id === user.id).length
-  const myClassCodes = [...new Set((myStudentsRaw || []).filter((u: any) => u.coaches?.user_id === user.id && u.class_code).map((u: any) => u.class_code))]
+  const myClassCodes = Array.from(new Set((myStudentsRaw || []).filter((u: any) => u.coaches?.user_id === user.id && u.class_code).map((u: any) => u.class_code)))
   const myKlasCount = (myStudentsRaw || []).filter((u: any) => myClassCodes.includes(u.class_code)).length
 
   if (allIds.length === 0) {
