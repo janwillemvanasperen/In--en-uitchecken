@@ -318,6 +318,7 @@ export function AttendanceDashboard({
   const [historyMetric, setHistoryMetric] = useState<HistoryMetric>('inclLeave')
   const [todayFilterCoach, setTodayFilterCoach] = useState('all')
   const [todayFilterClass, setTodayFilterClass] = useState('all')
+  const [todaySearch, setTodaySearch] = useState('')
 
   const currentDay = dayOverviews[selectedDayIdx] ?? dayOverviews[0]
 
@@ -338,11 +339,12 @@ export function AttendanceDashboard({
   // todayFilterCoach stores coach_name (DayStudent only has coach_name, not coach_id)
   const filteredDayStudents = useMemo(() => {
     return currentDay.students.filter(s => {
+      if (todaySearch && !s.full_name.toLowerCase().includes(todaySearch.toLowerCase())) return false
       if (todayFilterCoach !== 'all' && s.coach_name !== todayFilterCoach) return false
       if (todayFilterClass !== 'all' && s.class_code !== todayFilterClass) return false
       return true
     })
-  }, [currentDay.students, todayFilterCoach, todayFilterClass])
+  }, [currentDay.students, todaySearch, todayFilterCoach, todayFilterClass])
 
   const todayStats = useMemo(() => {
     const c = { ingepland: 0, aanwezig: 0, uitgecheck: 0, teLaat: 0, afwezig: 0, verlof: 0, verwacht: 0 }
@@ -443,36 +445,40 @@ export function AttendanceDashboard({
           )}
 
           {/* Filters */}
-          {(coaches.length > 0 || classes.length > 0) && (
-            <div className="flex flex-wrap gap-3">
-              {coaches.length > 0 && (
-                <Select value={todayFilterCoach} onValueChange={setTodayFilterCoach}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Alle coaches" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Alle coaches</SelectItem>
-                    {coaches.map(([, name]) => (
-                      <SelectItem key={name} value={name}>{name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              {classes.length > 0 && (
-                <Select value={todayFilterClass} onValueChange={setTodayFilterClass}>
-                  <SelectTrigger className="w-[160px]">
-                    <SelectValue placeholder="Alle klassen" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Alle klassen</SelectItem>
-                    {classes.map(c => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-          )}
+          <div className="flex flex-wrap gap-3">
+            <Input
+              placeholder="Zoek student..."
+              value={todaySearch}
+              onChange={e => setTodaySearch(e.target.value)}
+              className="max-w-[220px]"
+            />
+            {coaches.length > 0 && (
+              <Select value={todayFilterCoach} onValueChange={setTodayFilterCoach}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Alle coaches" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alle coaches</SelectItem>
+                  {coaches.map(([, name]) => (
+                    <SelectItem key={name} value={name}>{name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {classes.length > 0 && (
+              <Select value={todayFilterClass} onValueChange={setTodayFilterClass}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Alle klassen" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alle klassen</SelectItem>
+                  {classes.map(c => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
 
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
