@@ -119,21 +119,29 @@ function CheckInEditDialog({
   const [checkOut, setCheckOut] = useState(state.checkOutTime)
   const [error, setError] = useState<string | null>(null)
 
+  function toUtcIso(date: string, time: string): string {
+    // new Date("YYYY-MM-DDThh:mm:00") treats the string as LOCAL time in browsers,
+    // then .toISOString() converts to UTC — this is the correct UTC value to store.
+    return new Date(`${date}T${time}:00`).toISOString()
+  }
+
   function handleSave() {
     startTransition(async () => {
       setError(null)
       const outVal = checkOut.trim() || null
+      // Convert local time inputs to UTC ISO strings (browser knows the local offset)
+      const checkInIso = toUtcIso(state.date, checkIn)
+      const checkOutIso = outVal ? toUtcIso(state.date, outVal) : null
       let result: { error?: string }
       if (state.checkInId) {
-        result = await updateCheckInTimes(state.checkInId, state.date, checkIn, outVal)
+        result = await updateCheckInTimes(state.checkInId, checkInIso, checkOutIso)
       } else {
         result = await createManualCheckIn(
           state.studentId,
-          state.date,
-          checkIn,
-          outVal,
-          state.scheduledStart,
-          state.scheduledEnd,
+          checkInIso,
+          checkOutIso,
+          toUtcIso(state.date, state.scheduledStart.substring(0, 5)),
+          toUtcIso(state.date, state.scheduledEnd.substring(0, 5)),
         )
       }
       if (result.error) {
