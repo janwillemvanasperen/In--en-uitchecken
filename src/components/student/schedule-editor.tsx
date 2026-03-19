@@ -4,14 +4,20 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { submitSchedule, updatePendingSchedule, deletePendingSchedule } from '@/app/student/actions'
 import { Loader2, Clock, Trash2 } from 'lucide-react'
 import type { Schedule, ScheduleEntry } from '@/types'
+
+const FIXED_START_TIME = '10:00'
+
+const END_TIME_OPTIONS = [
+  '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00',
+]
 
 const DAY_NAMES: Record<number, string> = {
   1: 'Maandag',
@@ -39,41 +45,39 @@ interface ScheduleEditorProps {
 }
 
 function buildInitialEntries(
-  defaultStartTime: string,
   existingPending: Schedule[] | null
 ): ScheduleEntry[] {
-  const days = [1, 2, 3, 4, 5, 6, 7].map(day => {
+  return [1, 2, 3, 4, 5, 6, 7].map(day => {
     const existing = existingPending?.find(s => s.day_of_week === day)
     if (existing) {
+      const existingEnd = existing.end_time.slice(0, 5)
       return {
         day_of_week: day,
         active: true,
-        start_time: existing.start_time.slice(0, 5),
-        end_time: existing.end_time.slice(0, 5),
+        start_time: FIXED_START_TIME,
+        end_time: END_TIME_OPTIONS.includes(existingEnd) ? existingEnd : END_TIME_OPTIONS[4],
       }
     }
     return {
       day_of_week: day,
       active: day >= 1 && day <= 5,
-      start_time: defaultStartTime,
-      end_time: '17:00',
+      start_time: FIXED_START_TIME,
+      end_time: END_TIME_OPTIONS[4], // 15:00 default
     }
   })
-  return days
 }
 
 export function ScheduleEditor({
-  defaultStartTime,
   minimumHours,
   periodWeeks,
   existingPending,
   pushRequest,
-}: ScheduleEditorProps) {
+}: Omit<ScheduleEditorProps, 'defaultStartTime'> & { defaultStartTime?: string }) {
   const router = useRouter()
   const isEditing = !!existingPending && existingPending.length > 0
 
   const [entries, setEntries] = useState<ScheduleEntry[]>(
-    buildInitialEntries(defaultStartTime, existingPending)
+    buildInitialEntries(existingPending)
   )
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -199,24 +203,25 @@ export function ScheduleEditor({
 
               {entry.active && (
                 <>
-                  <div className="flex items-center gap-2">
-                    <Label className="text-xs text-muted-foreground sr-only">Start</Label>
-                    <Input
-                      type="time"
-                      value={entry.start_time}
-                      onChange={(e) => updateEntry(index, 'start_time', e.target.value)}
-                      className="w-[120px] h-9"
-                    />
-                  </div>
+                  <span className="text-sm font-mono tabular-nums text-muted-foreground w-[60px] text-center">
+                    {FIXED_START_TIME}
+                  </span>
                   <span className="text-muted-foreground">—</span>
                   <div className="flex items-center gap-2">
-                    <Label className="text-xs text-muted-foreground sr-only">Eind</Label>
-                    <Input
-                      type="time"
+                    <Label className="text-xs text-muted-foreground sr-only">Eindtijd</Label>
+                    <Select
                       value={entry.end_time}
-                      onChange={(e) => updateEntry(index, 'end_time', e.target.value)}
-                      className="w-[120px] h-9"
-                    />
+                      onValueChange={(val) => updateEntry(index, 'end_time', val)}
+                    >
+                      <SelectTrigger className="w-[100px] h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {END_TIME_OPTIONS.map((t) => (
+                          <SelectItem key={t} value={t}>{t}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <span className="text-sm text-muted-foreground ml-auto">
                     {calculateDayHours(entry).toFixed(1)}u

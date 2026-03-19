@@ -8,8 +8,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Loader2, Check, X, ChevronDown, ChevronUp, MessageSquare } from 'lucide-react'
-import { approveSchedule, rejectSchedule } from '@/app/admin/actions'
+import { Loader2, Check, X, ChevronDown, ChevronUp, MessageSquare, Pencil } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { approveSchedule, rejectSchedule, updateScheduleEntries } from '@/app/admin/actions'
 import type { Coach } from '@/types'
 
 type ScheduleRow = {
@@ -99,6 +100,11 @@ function ScheduleGroupCard({ group }: { group: ScheduleGroup }) {
   const [pendingAction, setPendingAction] = useState<'approve' | 'reject' | null>(null)
   const [loadingAction, setLoadingAction] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [editMode, setEditMode] = useState(false)
+  const [editedTimes, setEditedTimes] = useState<Record<string, { start_time: string; end_time: string }>>(() =>
+    Object.fromEntries(group.entries.map(e => [e.id, { start_time: e.start_time.slice(0, 5), end_time: e.end_time.slice(0, 5) }]))
+  )
+  const [savingEdit, setSavingEdit] = useState(false)
 
   const badge = STATUS_BADGES[group.status] || STATUS_BADGES.pending
 
@@ -174,14 +180,33 @@ function ScheduleGroupCard({ group }: { group: ScheduleGroup }) {
               </thead>
               <tbody className="divide-y">
                 {group.entries.map((entry) => {
-                  const [sh, sm] = entry.start_time.split(':').map(Number)
-                  const [eh, em] = entry.end_time.split(':').map(Number)
-                  const hours = (eh + em / 60) - (sh + sm / 60)
+                  const times = editedTimes[entry.id]
+                  const [sh, sm] = times.start_time.split(':').map(Number)
+                  const [eh, em] = times.end_time.split(':').map(Number)
+                  const hours = Math.max(0, (eh + em / 60) - (sh + sm / 60))
                   return (
                     <tr key={entry.id}>
                       <td className="px-4 py-2">{DAY_NAMES[entry.day_of_week]}</td>
-                      <td className="px-4 py-2">{entry.start_time.slice(0, 5)}</td>
-                      <td className="px-4 py-2">{entry.end_time.slice(0, 5)}</td>
+                      <td className="px-4 py-2">
+                        {editMode ? (
+                          <Input
+                            type="time"
+                            value={times.start_time}
+                            onChange={(e) => setEditedTimes(prev => ({ ...prev, [entry.id]: { ...prev[entry.id], start_time: e.target.value } }))}
+                            className="w-[110px] h-7 text-sm"
+                          />
+                        ) : times.start_time}
+                      </td>
+                      <td className="px-4 py-2">
+                        {editMode ? (
+                          <Input
+                            type="time"
+                            value={times.end_time}
+                            onChange={(e) => setEditedTimes(prev => ({ ...prev, [entry.id]: { ...prev[entry.id], end_time: e.target.value } }))}
+                            className="w-[110px] h-7 text-sm"
+                          />
+                        ) : times.end_time}
+                      </td>
                       <td className="px-4 py-2 text-right">{hours.toFixed(1)}</td>
                     </tr>
                   )
@@ -189,6 +214,37 @@ function ScheduleGroupCard({ group }: { group: ScheduleGroup }) {
               </tbody>
             </table>
           </div>
+
+          {editMode ? (
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={async () => {
+                  setSavingEdit(true)
+                  const entriesToSave = group.entries.map(e => ({ id: e.id, ...editedTimes[e.id] }))
+                  const result = await updateScheduleEntries(entriesToSave)
+                  if (result.error) setError(result.error)
+                  else setEditMode(false)
+                  setSavingEdit(false)
+                }}
+                disabled={savingEdit}
+              >
+                {savingEdit && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Opslaan
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => {
+                setEditedTimes(Object.fromEntries(group.entries.map(e => [e.id, { start_time: e.start_time.slice(0, 5), end_time: e.end_time.slice(0, 5) }])))
+                setEditMode(false)
+              }}>
+                Annuleren
+              </Button>
+            </div>
+          ) : (
+            <Button size="sm" variant="outline" onClick={() => setEditMode(true)} className="w-fit">
+              <Pencil className="mr-2 h-3 w-3" />
+              Tijden aanpassen
+            </Button>
+          )}
 
           {group.adminNote && group.status !== 'pending' && (
             <p className="text-sm text-muted-foreground flex items-center gap-1">

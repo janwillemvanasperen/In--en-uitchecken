@@ -283,6 +283,29 @@ export async function rejectSchedule(submissionGroup: string, adminNote?: string
   }
 }
 
+export async function updateScheduleEntries(
+  entries: Array<{ id: string; start_time: string; end_time: string }>
+) {
+  try {
+    await requireAdmin()
+    const adminClient = createAdminClient()
+
+    for (const { id, start_time, end_time } of entries) {
+      const { error } = await adminClient
+        .from('schedules')
+        .update({ start_time, end_time })
+        .eq('id', id)
+      if (error) return { error: `Opslaan mislukt: ${error.message}` }
+    }
+
+    revalidatePath('/admin/schedules')
+    return { success: true }
+  } catch (error) {
+    console.error('updateScheduleEntries error:', error)
+    return { error: 'Er is een onverwachte fout opgetreden' }
+  }
+}
+
 // ==================== SCHEDULE PUSH ====================
 
 export async function createSchedulePush(
@@ -346,6 +369,76 @@ export async function createSchedulePush(
     return { success: true }
   } catch (error) {
     console.error('Schedule push error:', error)
+    return { error: 'Er is een onverwachte fout opgetreden' }
+  }
+}
+
+export async function autoApplyExistingSchedules(pushRequestId: string) {
+  try {
+    await requireAdmin()
+    const adminClient = createAdminClient()
+
+    // Get the push request dates
+    const { data: push } = await adminClient
+      .from('schedule_push_requests')
+      .select('valid_from, valid_until')
+      .eq('id', pushRequestId)
+      .single()
+
+    if (!push) return { error: 'Push request niet gevonden' }
+
+    // Get non-responded recipients
+    const { data: recipients } = await adminClient
+      .from('schedule_push_recipients')
+      .select('student_id')
+      .eq('push_request_id', pushRequestId)
+      .eq('responded', false)
+
+    if (!recipients || recipients.length === 0) return { count: 0 }
+
+    const today = new Date().toISOString().split('T')[0]
+    let applied = 0
+
+    for (const { student_id } of recipients) {
+      // Find current active approved schedule for this student
+      const { data: currentEntries } = await adminClient
+        .from('schedules')
+        .select('day_of_week, start_time, end_time')
+        .eq('user_id', student_id)
+        .eq('status', 'approved')
+        .lte('valid_from', today)
+        .gte('valid_until', today)
+
+      if (!currentEntries || currentEntries.length === 0) continue
+
+      // Copy entries with push dates, auto-approved
+      const newEntries = currentEntries.map((e) => ({
+        user_id: student_id,
+        day_of_week: e.day_of_week,
+        start_time: e.start_time,
+        end_time: e.end_time,
+        valid_from: push.valid_from,
+        valid_until: push.valid_until,
+        status: 'approved' as const,
+        push_request_id: pushRequestId,
+      }))
+
+      const { error } = await adminClient.from('schedules').insert(newEntries)
+      if (error) continue
+
+      await adminClient
+        .from('schedule_push_recipients')
+        .update({ responded: true, responded_at: new Date().toISOString() })
+        .eq('push_request_id', pushRequestId)
+        .eq('student_id', student_id)
+
+      applied++
+    }
+
+    revalidatePath('/admin/schedule-push')
+    return { count: applied }
+  } catch (error) {
+    console.error('autoApplyExistingSchedules error:', error)
     return { error: 'Er is een onverwachte fout opgetreden' }
   }
 }
