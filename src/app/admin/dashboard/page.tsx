@@ -13,17 +13,14 @@ export default async function AdminDashboard() {
   const user = await requireAdmin()
   const supabase = await createClient()
 
-  // Get today info for schedule count
   const today = new Date()
   const dayOfWeek = today.getDay() || 7
   const todayStr = today.toISOString().split('T')[0]
 
-  // Get statistics
   const [
     { count: studentCount },
     { count: pendingSchedules },
     { count: pendingLeave },
-    { count: locationsCount },
     { count: activeCheckIns },
     { data: recentCheckIns },
     { count: coachCount },
@@ -32,152 +29,141 @@ export default async function AdminDashboard() {
     supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'student'),
     supabase.from('schedules').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase.from('leave_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-    supabase.from('locations').select('*', { count: 'exact', head: true }),
     supabase.from('check_ins').select('*', { count: 'exact', head: true }).is('check_out_time', null),
     supabase.from('check_ins').select('*, users!check_ins_user_id_fkey(full_name), locations!check_ins_location_id_fkey(name)').order('check_in_time', { ascending: false }).limit(5),
     supabase.from('coaches').select('*', { count: 'exact', head: true }).eq('active', true),
     supabase.from('schedules').select('*', { count: 'exact', head: true }).eq('day_of_week', dayOfWeek).eq('status', 'approved').lte('valid_from', todayStr).gte('valid_until', todayStr),
   ])
 
-  const navCards = [
-    { title: 'Mijn Studenten', description: 'Overzicht en voortgang per student', href: '/admin/my-students', icon: UserCheck, badge: activeCheckIns },
-    { title: 'Gebruikersbeheer', description: 'Beheer student accounts', href: '/admin/users', icon: Users },
-    { title: 'Coaches', description: 'Beheer coaches en groepen', href: '/admin/coaches', icon: GraduationCap, badge: coachCount },
-    { title: 'Locatiebeheer', description: 'Voeg locaties toe of bewerk ze', href: '/admin/locations', icon: MapPin },
-    { title: 'Roostergoedkeuring', description: 'Keur student roosters goed', href: '/admin/schedules', icon: Calendar, badge: pendingSchedules },
-    { title: 'Verlofgoedkeuring', description: 'Keur verlofaanvragen goed of af', href: '/admin/leave-requests', icon: FileText, badge: pendingLeave },
-    { title: 'Aanwezigheid', description: 'Bekijk check-ins en exporteer', href: '/admin/check-ins', icon: ClipboardCheck },
-    { title: 'Ontwikkeldoelen', description: 'Beheer doelnamen en fases per student', href: '/admin/development-goals', icon: Target },
-    { title: 'Notitie labels', description: 'Beheer labels voor coach notities', href: '/admin/note-labels', icon: Tag },
-    { title: 'Roosterpush', description: 'Stuur studenten een verzoek om rooster in te vullen', href: '/admin/schedule-push', icon: Send },
-    { title: 'Instellingen', description: 'Wijzig systeeminstellingen', href: '/admin/settings', icon: Settings },
+  const sections = [
+    {
+      title: 'Dagelijks',
+      items: [
+        { title: 'Mijn studenten', description: 'Overzicht en voortgang per student', href: '/admin/my-students', icon: UserCheck, badge: activeCheckIns || null },
+        { title: 'Aanwezigheid', description: 'Bekijk check-ins en exporteer', href: '/admin/check-ins', icon: ClipboardCheck },
+        { title: 'Roostergoedkeuring', description: 'Keur ingediende roosters goed of af', href: '/admin/schedules', icon: Calendar, badge: pendingSchedules || null },
+        { title: 'Verlofgoedkeuring', description: 'Keur verlofaanvragen goed of af', href: '/admin/leave-requests', icon: FileText, badge: pendingLeave || null },
+        { title: 'Roosterpush', description: 'Stuur studenten een roosterverzoek', href: '/admin/schedule-push', icon: Send },
+      ],
+    },
+    {
+      title: 'Beheer',
+      items: [
+        { title: 'Gebruikers', description: 'Beheer student- en beheerdersaccounts', href: '/admin/users', icon: Users },
+        { title: 'Coaches', description: 'Beheer coaches, werkroosters en groepen', href: '/admin/coaches', icon: GraduationCap, badge: coachCount || null },
+        { title: 'Locaties', description: 'Voeg locaties toe of bewerk ze', href: '/admin/locations', icon: MapPin },
+      ],
+    },
+    {
+      title: 'Configuratie',
+      items: [
+        { title: 'Ontwikkeldoelen', description: 'Beheer doelnamen en fases', href: '/admin/development-goals', icon: Target },
+        { title: 'Notitie labels', description: 'Beheer labels voor coach notities', href: '/admin/note-labels', icon: Tag },
+        { title: 'Instellingen', description: 'Systeeminstellingen en dagcapaciteit', href: '/admin/settings', icon: Settings },
+      ],
+    },
   ]
 
   return (
-    <>
-      <main className="container mx-auto px-4 py-8">
-        {/* Statistics */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Studenten</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">{studentCount || 0}</p>
-            </CardContent>
-          </Card>
+    <main className="container mx-auto px-4 py-8 space-y-8">
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Actieve check-ins</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold text-green-600">{activeCheckIns || 0}</p>
-            </CardContent>
-          </Card>
+      {/* Stats row */}
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-1">
+            <CardDescription>Studenten</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{studentCount || 0}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-1">
+            <CardDescription>Nu aanwezig</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold text-green-600">{activeCheckIns || 0}</p>
+            <p className="text-xs text-muted-foreground">{scheduledTodayCount || 0} ingepland vandaag</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-1">
+            <CardDescription>Roosters te beoordelen</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className={`text-3xl font-bold ${(pendingSchedules || 0) > 0 ? 'text-orange-500' : ''}`}>{pendingSchedules || 0}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-1">
+            <CardDescription>Verlof te beoordelen</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className={`text-3xl font-bold ${(pendingLeave || 0) > 0 ? 'text-orange-500' : ''}`}>{pendingLeave || 0}</p>
+          </CardContent>
+        </Card>
+      </div>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Pending roosters</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">{pendingSchedules || 0}</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Pending verlof</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">{pendingLeave || 0}</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Studenten Vandaag widget */}
-        <Card className="mt-6">
+      {/* Recent check-ins */}
+      {recentCheckIns && recentCheckIns.length > 0 && (
+        <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              <UserCheck className="h-4 w-4" />
-              Studenten vandaag
+              <Clock className="h-4 w-4" />
+              Recente check-ins
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-6">
-              <div>
-                <p className="text-2xl font-bold text-green-600">{activeCheckIns || 0}</p>
-                <p className="text-xs text-muted-foreground">nu actief</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{scheduledTodayCount || 0}</p>
-                <p className="text-xs text-muted-foreground">ingepland</p>
-              </div>
-              <Link href="/admin/my-students" className="ml-auto">
-                <Button variant="outline" size="sm">Bekijk studenten</Button>
-              </Link>
+            <div className="space-y-2">
+              {recentCheckIns.map((ci: any) => (
+                <div key={ci.id} className="flex items-center justify-between text-sm">
+                  <div>
+                    <span className="font-medium">{ci.users?.full_name || 'Onbekend'}</span>
+                    <span className="text-muted-foreground"> · </span>
+                    <span className="text-muted-foreground">{ci.locations?.name || 'Onbekend'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground tabular-nums">
+                      {new Date(ci.check_in_time).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    {ci.check_out_time ? (
+                      <Badge variant="secondary">Uit</Badge>
+                    ) : (
+                      <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Actief</Badge>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
+      )}
 
-        {/* Recent activity */}
-        {recentCheckIns && recentCheckIns.length > 0 && (
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                Recente activiteit
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {recentCheckIns.map((ci: any) => (
-                  <div key={ci.id} className="flex items-center justify-between text-sm">
-                    <div>
-                      <span className="font-medium">{ci.users?.full_name || 'Onbekend'}</span>
-                      <span className="text-muted-foreground"> bij </span>
-                      <span>{ci.locations?.name || 'Onbekend'}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground">
-                        {new Date(ci.check_in_time).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                      {ci.check_out_time ? (
-                        <Badge variant="secondary">Uit</Badge>
-                      ) : (
-                        <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Actief</Badge>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Navigation cards */}
-        <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {navCards.map((card) => (
-            <Card key={card.href}>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <card.icon className="h-5 w-5" />
-                  {card.title}
-                  {card.badge ? (
-                    <Badge variant="secondary" className="ml-auto">{card.badge}</Badge>
-                  ) : null}
-                </CardTitle>
-                <CardDescription>{card.description}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Link href={card.href}>
-                  <Button className="w-full">Openen</Button>
-                </Link>
-              </CardContent>
-            </Card>
-          ))}
+      {/* Grouped nav sections */}
+      {sections.map((section) => (
+        <div key={section.title}>
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">{section.title}</h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {section.items.map((item) => (
+              <Link key={item.href} href={item.href}>
+                <Card className="h-full hover:border-foreground/30 transition-colors cursor-pointer">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      {item.title}
+                      {item.badge ? (
+                        <Badge variant="secondary" className="ml-auto">{item.badge}</Badge>
+                      ) : null}
+                    </CardTitle>
+                    <CardDescription className="text-xs">{item.description}</CardDescription>
+                  </CardHeader>
+                </Card>
+              </Link>
+            ))}
+          </div>
         </div>
-      </main>
-    </>
+      ))}
+
+    </main>
   )
 }
