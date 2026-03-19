@@ -36,12 +36,18 @@ interface PushRequest {
   message: string | null
 }
 
+interface DayCapacityInfo {
+  used: number
+  max: number
+}
+
 interface ScheduleEditorProps {
   defaultStartTime: string
   minimumHours: number
   periodWeeks: number
   existingPending: Schedule[] | null
   pushRequest?: PushRequest | null
+  dayCapacity?: Record<number, DayCapacityInfo>
 }
 
 function buildInitialEntries(
@@ -72,6 +78,7 @@ export function ScheduleEditor({
   periodWeeks,
   existingPending,
   pushRequest,
+  dayCapacity,
 }: Omit<ScheduleEditorProps, 'defaultStartTime'> & { defaultStartTime?: string }) {
   const router = useRouter()
   const isEditing = !!existingPending && existingPending.length > 0
@@ -125,6 +132,7 @@ export function ScheduleEditor({
 
     if (result.error) {
       setError(result.error)
+      setIsSubmitting(false)
     } else {
       setSuccess(
         result.autoApproved
@@ -134,9 +142,10 @@ export function ScheduleEditor({
           : 'Rooster ingediend! Wacht op goedkeuring van je docent.'
       )
       router.refresh()
+      setTimeout(() => {
+        router.push('/student/dashboard')
+      }, 2500)
     }
-
-    setIsSubmitting(false)
   }
 
   const handleDelete = async () => {
@@ -190,56 +199,73 @@ export function ScheduleEditor({
 
         {/* Day entries */}
         <div className="space-y-3">
-          {entries.map((entry, index) => (
-            <div
-              key={entry.day_of_week}
-              className={`flex items-center gap-3 rounded-lg border p-3 transition-colors ${
-                entry.active ? 'bg-background' : 'bg-muted/50 opacity-60'
-              }`}
-            >
-              <label className="flex items-center gap-2 min-w-[120px] cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={entry.active}
-                  onChange={(e) => updateEntry(index, 'active', e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300"
-                />
-                <span className="text-sm font-medium">{DAY_NAMES[entry.day_of_week]}</span>
-              </label>
+          {entries.map((entry, index) => {
+            const cap = dayCapacity?.[entry.day_of_week]
+            const isFull = cap ? cap.used >= cap.max : false
+            const isDisabledByCapacity = isFull && !entry.active
 
-              {entry.active && (
-                <>
-                  <span className="text-sm font-mono tabular-nums text-muted-foreground w-[60px] text-center">
-                    {FIXED_START_TIME}
-                  </span>
-                  <span className="text-muted-foreground">—</span>
-                  <div className="flex items-center gap-2">
-                    <Label className="text-xs text-muted-foreground sr-only">Eindtijd</Label>
-                    <Select
-                      value={entry.end_time}
-                      onValueChange={(val) => updateEntry(index, 'end_time', val)}
-                    >
-                      <SelectTrigger className="w-[100px] h-9">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {END_TIME_OPTIONS.map((t) => (
-                          <SelectItem key={t} value={t}>{t}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <span className="text-sm text-muted-foreground ml-auto">
-                    {calculateDayHours(entry).toFixed(1)}u
-                  </span>
-                </>
-              )}
+            return (
+              <div
+                key={entry.day_of_week}
+                className={`flex items-center gap-3 rounded-lg border p-3 transition-colors ${
+                  isDisabledByCapacity
+                    ? 'bg-muted/50 opacity-60 border-red-200'
+                    : entry.active
+                    ? 'bg-background'
+                    : 'bg-muted/50 opacity-60'
+                }`}
+              >
+                <label className={`flex items-center gap-2 min-w-[120px] ${isDisabledByCapacity ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                  <input
+                    type="checkbox"
+                    checked={entry.active}
+                    disabled={isDisabledByCapacity}
+                    onChange={(e) => updateEntry(index, 'active', e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 disabled:cursor-not-allowed"
+                  />
+                  <span className="text-sm font-medium">{DAY_NAMES[entry.day_of_week]}</span>
+                </label>
 
-              {!entry.active && (
-                <span className="text-sm text-muted-foreground ml-auto">Vrij</span>
-              )}
-            </div>
-          ))}
+                {entry.active && (
+                  <>
+                    <span className="text-sm font-mono tabular-nums text-muted-foreground w-[60px] text-center">
+                      {FIXED_START_TIME}
+                    </span>
+                    <span className="text-muted-foreground">—</span>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs text-muted-foreground sr-only">Eindtijd</Label>
+                      <Select
+                        value={entry.end_time}
+                        onValueChange={(val) => updateEntry(index, 'end_time', val)}
+                      >
+                        <SelectTrigger className="w-[100px] h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {END_TIME_OPTIONS.map((t) => (
+                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <span className="text-sm text-muted-foreground ml-auto">
+                      {calculateDayHours(entry).toFixed(1)}u
+                    </span>
+                  </>
+                )}
+
+                {!entry.active && isDisabledByCapacity && cap && (
+                  <span className="text-sm text-red-500 ml-auto">
+                    Volgeboekt ({cap.used}/{cap.max})
+                  </span>
+                )}
+
+                {!entry.active && !isDisabledByCapacity && (
+                  <span className="text-sm text-muted-foreground ml-auto">Vrij</span>
+                )}
+              </div>
+            )
+          })}
         </div>
 
         {/* Hours summary */}

@@ -47,6 +47,32 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
   const defaultStartTime = settingsMap['default_start_time'] || '10:00'
   const periodWeeks = Number(settingsMap['schedule_approval_period_weeks'] || '6')
 
+  // Fetch day capacities + current occupancy (excluding this student)
+  const [{ data: capacityRows }, { data: occupancyRows }] = await Promise.all([
+    adminClient.from('day_capacities').select('day_of_week, max_spots'),
+    adminClient
+      .from('schedules')
+      .select('user_id, day_of_week')
+      .eq('status', 'approved')
+      .gte('valid_until', today)
+      .neq('user_id', user.id),
+  ])
+
+  // Count distinct students per day
+  const usedByDay: Record<number, Set<string>> = {}
+  for (const row of occupancyRows || []) {
+    if (!usedByDay[row.day_of_week]) usedByDay[row.day_of_week] = new Set()
+    usedByDay[row.day_of_week].add(row.user_id)
+  }
+
+  const dayCapacity: Record<number, { used: number; max: number }> = {}
+  for (const cap of capacityRows || []) {
+    dayCapacity[cap.day_of_week] = {
+      max: cap.max_spots,
+      used: usedByDay[cap.day_of_week]?.size ?? 0,
+    }
+  }
+
   // Open schedule push request for this student
   const { data: openPushRecipient } = await adminClient
     .from('schedule_push_recipients')
@@ -116,6 +142,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
           minimumHours={minimumHours}
           periodWeeks={periodWeeks}
           existingPending={pendingSchedule}
+          dayCapacity={dayCapacity}
           pushRequest={openPush ? {
             id: openPush.id,
             valid_from: openPush.valid_from,

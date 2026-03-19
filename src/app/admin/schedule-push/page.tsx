@@ -2,6 +2,7 @@
 import { requireAdmin } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { SchedulePushForm } from '@/components/admin/schedule-push-form'
+import { AutoApplyButton } from '@/components/admin/auto-apply-button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Send, CheckCircle2, Clock } from 'lucide-react'
@@ -102,7 +103,7 @@ export default async function SchedulePushPage() {
                     </Badge>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-0 space-y-1">
+                <CardContent className="pt-0 space-y-2">
                   {p.message && (
                     <p className="text-sm text-muted-foreground italic">&quot;{p.message}&quot;</p>
                   )}
@@ -110,6 +111,10 @@ export default async function SchedulePushPage() {
                     Verstuurd door {p.users?.full_name ?? '—'} op{' '}
                     {new Date(p.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })}
                   </p>
+                  <AutoApplyButton
+                    pushRequestId={p.id}
+                    notRespondedCount={stats.total - stats.responded}
+                  />
                 </CardContent>
               </Card>
             )

@@ -402,6 +402,11 @@ export type Database = {
           updated_by?: string | null
         }
       }
+      day_capacities: {
+        Row: { day_of_week: number; max_spots: number; updated_at: string }
+        Insert: { day_of_week: number; max_spots: number; updated_at?: string }
+        Update: { day_of_week?: number; max_spots?: number; updated_at?: string }
+      }
       check_ins: {
         Row: {
           id: string

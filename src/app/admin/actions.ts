@@ -373,6 +373,27 @@ export async function createSchedulePush(
   }
 }
 
+export async function updateDayCapacities(capacities: Array<{ day_of_week: number; max_spots: number }>) {
+  try {
+    await requireAdmin()
+    const adminClient = createAdminClient()
+
+    for (const { day_of_week, max_spots } of capacities) {
+      const { error } = await adminClient
+        .from('day_capacities')
+        .upsert({ day_of_week, max_spots, updated_at: new Date().toISOString() })
+      if (error) return { error: `Opslaan mislukt: ${error.message}` }
+    }
+
+    revalidatePath('/admin/settings')
+    revalidatePath('/student/schedule')
+    return { success: true }
+  } catch (error) {
+    console.error('updateDayCapacities error:', error)
+    return { error: 'Er is een onverwachte fout opgetreden' }
+  }
+}
+
 export async function autoApplyExistingSchedules(pushRequestId: string) {
   try {
     await requireAdmin()
