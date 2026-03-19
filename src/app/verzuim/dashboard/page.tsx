@@ -5,10 +5,10 @@ import { AttendanceDashboard } from '@/components/verzuim/attendance-dashboard'
 
 export const dynamic = 'force-dynamic'
 
-// ---- Types ----
-type TodayStatus = 'aanwezig' | 'uitgecheck' | 'te-laat' | 'afwezig' | 'verlof' | 'verwacht'
+// ---- Types (shared with client via props) ----
+export type TodayStatus = 'aanwezig' | 'uitgecheck' | 'te-laat' | 'afwezig' | 'verlof' | 'verwacht'
 
-interface TodayStudent {
+export interface DayStudent {
   id: string
   full_name: string
   coach_name: string | null
@@ -16,24 +16,33 @@ interface TodayStudent {
   scheduled_start: string
   scheduled_end: string
   scheduled_hours: number
+  check_in_id: string | null
   check_in_time: string | null
   check_out_time: string | null
   actual_hours: number
   status: TodayStatus
 }
 
-interface WeekRow {
+export interface DayOverview {
+  date: string
+  dayLabel: string
+  students: DayStudent[]
+}
+
+export interface WeekRow {
   monday: string
   label: string
   shortLabel: string
-  scheduledHours: number
-  actualHours: number
-  met16h: boolean
-  adherencePct: number | null
   isCurrent: boolean
+  scheduledHours: number
+  actualHoursInclLeave: number   // check-in hours + scheduled hours on leave days
+  actualHoursOnSchedule: number  // overlap between check-in window and schedule block
+  actualHoursExclLeave: number   // raw check-in hours only
+  met16h: boolean                // actualHoursInclLeave >= 16
+  adherencePct: number | null    // actualHoursOnSchedule / scheduledHours * 100
 }
 
-interface StudentHistory {
+export interface StudentHistory {
   id: string
   full_name: string
   coach_id: string | null
@@ -41,7 +50,10 @@ interface StudentHistory {
   class_code: string | null
   cohort: string | null
   weeks: WeekRow[]
-  avgActualHours: number
+  avgInclLeave: number
+  avgExclLeave: number
+  avgOnSchedule: number
+  avgScheduled: number
   weeksMet16h: number
   totalWeeksWithSchedule: number
 }
@@ -52,10 +64,10 @@ interface WeekMeta {
   label: string
   shortLabel: string
   isCurrent: boolean
-  days: string[] // Mon–Fri date strings
+  days: string[]
 }
 
-// ---- Helpers ----
+// ---- Date helpers ----
 function toDateStr(d: Date): string {
   return d.toISOString().split('T')[0]
 }
@@ -80,29 +92,37 @@ function isoWeekNumber(d: Date): number {
   tmp.setDate(tmp.getDate() + 3 - ((tmp.getDay() + 6) % 7))
   const w1 = new Date(tmp.getFullYear(), 0, 4)
   return (
-    1 +
-    Math.round(
-      ((tmp.getTime() - w1.getTime()) / 86400000 - 3 + ((w1.getDay() + 6) % 7)) / 7,
-    )
+    1 + Math.round(((tmp.getTime() - w1.getTime()) / 86400000 - 3 + ((w1.getDay() + 6) % 7)) / 7)
   )
 }
 
 function getLast8Weeks(now: Date): WeekMeta[] {
   const thisMonday = getMonday(now)
-  const result: WeekMeta[] = []
-  for (let i = 7; i >= 0; i--) {
-    const monday = addDays(thisMonday, -i * 7)
+  return Array.from({ length: 8 }, (_, i) => {
+    const monday = addDays(thisMonday, -(7 - i) * 7)
     const friday = addDays(monday, 4)
-    result.push({
+    return {
       monday: toDateStr(monday),
       friday: toDateStr(friday),
       label: `${monday.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })} – ${friday.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`,
       shortLabel: `W${isoWeekNumber(monday)}`,
-      isCurrent: i === 0,
+      isCurrent: i === 7,
       days: Array.from({ length: 5 }, (_, j) => toDateStr(addDays(monday, j))),
-    })
+    }
+  })
+}
+
+// Returns last N working days (Mon-Fri), today first
+function getLast5WorkDays(now: Date): Date[] {
+  const result: Date[] = []
+  const d = new Date(now)
+  d.setHours(0, 0, 0, 0)
+  while (result.length < 5) {
+    const dow = d.getDay()
+    if (dow !== 0 && dow !== 6) result.push(new Date(d))
+    d.setDate(d.getDate() - 1)
   }
-  return result // oldest → newest
+  return result
 }
 
 function timeDiffHours(start: string, end: string): number {
@@ -111,24 +131,21 @@ function timeDiffHours(start: string, end: string): number {
   return (eh * 60 + em - (sh * 60 + sm)) / 60
 }
 
+// ---- Hour computation helpers ----
 function computeScheduledHours(studentId: string, week: WeekMeta, schedules: any[]): number {
   let hours = 0
-  for (let dayIdx = 0; dayIdx < 5; dayIdx++) {
-    const dayOfWeek = dayIdx + 1 // 1=Mon … 5=Fri
-    const dateStr = week.days[dayIdx]
+  for (let i = 0; i < 5; i++) {
+    const dow = i + 1
+    const dateStr = week.days[i]
     const s = schedules.find(
-      s =>
-        s.user_id === studentId &&
-        s.day_of_week === dayOfWeek &&
-        s.valid_from <= dateStr &&
-        s.valid_until >= dateStr,
+      s => s.user_id === studentId && s.day_of_week === dow && s.valid_from <= dateStr && s.valid_until >= dateStr,
     )
     if (s) hours += timeDiffHours(s.start_time, s.end_time)
   }
   return hours
 }
 
-function computeActualHours(
+function computeActualHoursExclLeave(
   studentId: string,
   week: WeekMeta,
   checkIns: any[],
@@ -141,16 +158,144 @@ function computeActualHours(
     const d = ci.check_in_time.split('T')[0]
     if (d < week.monday || d > week.friday) continue
     if (ci.check_out_time) {
-      hours +=
-        (new Date(ci.check_out_time).getTime() - new Date(ci.check_in_time).getTime()) /
-        3600000
+      hours += (new Date(ci.check_out_time).getTime() - new Date(ci.check_in_time).getTime()) / 3600000
     } else if (d === todayStr) {
-      // Still checked in — use current time as running estimate
       hours += (now.getTime() - new Date(ci.check_in_time).getTime()) / 3600000
     }
-    // If no checkout and not today: skip (incomplete record)
   }
   return Math.round(hours * 10) / 10
+}
+
+function computeLeaveHours(studentId: string, week: WeekMeta, schedules: any[], leave: any[]): number {
+  let hours = 0
+  for (let i = 0; i < 5; i++) {
+    const dow = i + 1
+    const dateStr = week.days[i]
+    const onLeave = leave.some(l => l.user_id === studentId && l.date === dateStr)
+    if (!onLeave) continue
+    const s = schedules.find(
+      s => s.user_id === studentId && s.day_of_week === dow && s.valid_from <= dateStr && s.valid_until >= dateStr,
+    )
+    if (s) hours += timeDiffHours(s.start_time, s.end_time)
+  }
+  return Math.round(hours * 10) / 10
+}
+
+function computeHoursOnSchedule(
+  studentId: string,
+  week: WeekMeta,
+  schedules: any[],
+  checkIns: any[],
+  todayStr: string,
+  now: Date,
+): number {
+  let hours = 0
+  for (let i = 0; i < 5; i++) {
+    const dow = i + 1
+    const dateStr = week.days[i]
+    const sched = schedules.find(
+      s => s.user_id === studentId && s.day_of_week === dow && s.valid_from <= dateStr && s.valid_until >= dateStr,
+    )
+    if (!sched) continue
+    const ci = checkIns.find(ci => ci.user_id === studentId && ci.check_in_time.startsWith(dateStr))
+    if (!ci) continue
+
+    const schedStart = new Date(dateStr + 'T' + sched.start_time).getTime()
+    const schedEnd = new Date(dateStr + 'T' + sched.end_time).getTime()
+    const ciStart = new Date(ci.check_in_time).getTime()
+    const ciEnd = ci.check_out_time
+      ? new Date(ci.check_out_time).getTime()
+      : dateStr === todayStr
+        ? now.getTime()
+        : 0
+
+    if (!ciEnd) continue
+    const overlapStart = Math.max(ciStart, schedStart)
+    const overlapEnd = Math.min(ciEnd, schedEnd)
+    if (overlapEnd > overlapStart) hours += (overlapEnd - overlapStart) / 3600000
+  }
+  return Math.round(hours * 10) / 10
+}
+
+function avg(arr: number[]): number {
+  return arr.length > 0 ? Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10 : 0
+}
+
+// ---- Build day overview ----
+const STATUS_SORT: Record<TodayStatus, number> = {
+  afwezig: 0, 'te-laat': 1, verwacht: 2, aanwezig: 3, uitgecheck: 4, verlof: 5,
+}
+
+function computeDayStudents(
+  dateStr: string,
+  isToday: boolean,
+  students: any[],
+  allSchedules: any[],
+  allCheckIns: any[],
+  allLeave: any[],
+  coachMap: Record<string, string>,
+  now: Date,
+): DayStudent[] {
+  const date = new Date(dateStr + 'T12:00:00')
+  const dow = date.getDay() === 0 ? 7 : date.getDay()
+  const result: DayStudent[] = []
+
+  for (const student of students) {
+    const sched = allSchedules.find(
+      s => s.user_id === student.id && s.day_of_week === dow && s.valid_from <= dateStr && s.valid_until >= dateStr,
+    )
+    if (!sched) continue
+
+    const onLeave = allLeave.some(l => l.user_id === student.id && l.date === dateStr)
+    const ci = allCheckIns.find(ci => ci.user_id === student.id && ci.check_in_time.startsWith(dateStr))
+    const scheduledHours = timeDiffHours(sched.start_time, sched.end_time)
+
+    let actualHours = 0
+    let status: TodayStatus
+
+    if (onLeave) {
+      status = 'verlof'
+    } else if (ci) {
+      if (ci.check_out_time) {
+        actualHours =
+          (new Date(ci.check_out_time).getTime() - new Date(ci.check_in_time).getTime()) / 3600000
+        status = 'uitgecheck'
+      } else {
+        actualHours = isToday
+          ? (now.getTime() - new Date(ci.check_in_time).getTime()) / 3600000
+          : 0 // past day without checkout — show 0, edit to fix
+        const schedStart = new Date(dateStr + 'T' + sched.start_time).getTime()
+        status =
+          new Date(ci.check_in_time).getTime() > schedStart + 15 * 60000 ? 'te-laat' : 'aanwezig'
+      }
+    } else {
+      if (isToday) {
+        const schedStart = new Date(dateStr + 'T' + sched.start_time).getTime()
+        status = now.getTime() < schedStart ? 'verwacht' : 'afwezig'
+      } else {
+        status = 'afwezig'
+      }
+    }
+
+    result.push({
+      id: student.id,
+      full_name: student.full_name,
+      coach_name: student.coach_id ? (coachMap[student.coach_id] ?? null) : null,
+      class_code: student.class_code,
+      scheduled_start: sched.start_time,
+      scheduled_end: sched.end_time,
+      scheduled_hours: Math.round(scheduledHours * 10) / 10,
+      check_in_id: ci?.id ?? null,
+      check_in_time: ci?.check_in_time ?? null,
+      check_out_time: ci?.check_out_time ?? null,
+      actual_hours: Math.round(actualHours * 10) / 10,
+      status,
+    })
+  }
+
+  return result.sort(
+    (a, b) => STATUS_SORT[a.status] - STATUS_SORT[b.status] || a.full_name.localeCompare(b.full_name, 'nl'),
+  )
 }
 
 // ---- Page ----
@@ -160,9 +305,9 @@ export default async function VerzuimDashboard() {
 
   const now = new Date()
   const todayStr = toDateStr(now)
-  const todayDow = now.getDay() === 0 ? 7 : now.getDay() // 1=Mon … 7=Sun
 
   const weeks = getLast8Weeks(now)
+  const workDays = getLast5WorkDays(now)
   const earliest = weeks[0].monday
   const latest = weeks[7].friday
 
@@ -189,7 +334,7 @@ export default async function VerzuimDashboard() {
       .gte('valid_until', earliest),
     adminClient
       .from('check_ins')
-      .select('user_id, check_in_time, check_out_time')
+      .select('id, user_id, check_in_time, check_out_time')
       .gte('check_in_time', earliest + 'T00:00:00')
       .lte('check_in_time', latest + 'T23:59:59'),
     adminClient
@@ -198,136 +343,66 @@ export default async function VerzuimDashboard() {
       .eq('status', 'approved')
       .gte('date', earliest)
       .lte('date', latest),
-    adminClient
-      .from('leave_requests')
-      .select('id')
-      .eq('status', 'pending'),
-    adminClient
-      .from('schedules')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'pending'),
+    adminClient.from('leave_requests').select('id').eq('status', 'pending'),
+    adminClient.from('schedules').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
   ])
 
   const coachMap: Record<string, string> = {}
   for (const c of coaches || []) coachMap[c.id] = c.name
 
-  // ---- Build today's student list ----
-  const STATUS_SORT: Record<TodayStatus, number> = {
-    afwezig: 0,
-    'te-laat': 1,
-    verwacht: 2,
-    aanwezig: 3,
-    uitgecheck: 4,
-    verlof: 5,
+  // ---- Day overviews (last 5 working days) ----
+  const dayLabels = (d: Date, i: number) => {
+    const dateFormatted = d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
+    if (i === 0) return `Vandaag — ${dateFormatted}`
+    if (i === 1) return `Gisteren — ${dateFormatted}`
+    return dateFormatted.charAt(0).toUpperCase() + dateFormatted.slice(1)
   }
 
-  const todayStudents: TodayStudent[] = []
-
-  for (const student of students || []) {
-    const todaySchedule = (allSchedules || []).find(
-      s =>
-        s.user_id === student.id &&
-        s.day_of_week === todayDow &&
-        s.valid_from <= todayStr &&
-        s.valid_until >= todayStr,
-    )
-    if (!todaySchedule) continue // not scheduled today
-
-    const onLeave = (allLeave || []).some(
-      l => l.user_id === student.id && l.date === todayStr,
-    )
-    const checkIn = (allCheckIns || []).find(
-      ci => ci.user_id === student.id && ci.check_in_time.startsWith(todayStr),
-    )
-
-    const scheduledHours = timeDiffHours(todaySchedule.start_time, todaySchedule.end_time)
-    let actualHours = 0
-    let status: TodayStatus
-
-    if (onLeave) {
-      status = 'verlof'
-    } else if (checkIn) {
-      if (checkIn.check_out_time) {
-        actualHours =
-          (new Date(checkIn.check_out_time).getTime() -
-            new Date(checkIn.check_in_time).getTime()) /
-          3600000
-        status = 'uitgecheck'
-      } else {
-        actualHours =
-          (now.getTime() - new Date(checkIn.check_in_time).getTime()) / 3600000
-        // Te laat = checked in >15 min after scheduled start
-        const schedStart = new Date(todayStr + 'T' + todaySchedule.start_time).getTime()
-        status =
-          new Date(checkIn.check_in_time).getTime() > schedStart + 15 * 60000
-            ? 'te-laat'
-            : 'aanwezig'
-      }
-    } else {
-      const schedStart = new Date(todayStr + 'T' + todaySchedule.start_time).getTime()
-      status = now.getTime() < schedStart ? 'verwacht' : 'afwezig'
+  const dayOverviews: DayOverview[] = workDays.map((d, i) => {
+    const dateStr = toDateStr(d)
+    return {
+      date: dateStr,
+      dayLabel: dayLabels(d, i),
+      students: computeDayStudents(
+        dateStr,
+        i === 0,
+        students || [],
+        allSchedules || [],
+        allCheckIns || [],
+        allLeave || [],
+        coachMap,
+        now,
+      ),
     }
+  })
 
-    todayStudents.push({
-      id: student.id,
-      full_name: student.full_name,
-      coach_name: student.coach_id ? (coachMap[student.coach_id] ?? null) : null,
-      class_code: student.class_code,
-      scheduled_start: todaySchedule.start_time,
-      scheduled_end: todaySchedule.end_time,
-      scheduled_hours: Math.round(scheduledHours * 10) / 10,
-      check_in_time: checkIn?.check_in_time ?? null,
-      check_out_time: checkIn?.check_out_time ?? null,
-      actual_hours: Math.round(actualHours * 10) / 10,
-      status,
-    })
-  }
-
-  todayStudents.sort(
-    (a, b) =>
-      STATUS_SORT[a.status] - STATUS_SORT[b.status] ||
-      a.full_name.localeCompare(b.full_name, 'nl'),
-  )
-
-  // ---- Build 8-week history per student ----
-  const studentHistories: StudentHistory[] = []
-
-  for (const student of students || []) {
+  // ---- Student history (8 weeks, 4 metrics) ----
+  const studentHistories: StudentHistory[] = (students || []).map(student => {
     const weekRows: WeekRow[] = weeks.map(week => {
       const scheduledHours = computeScheduledHours(student.id, week, allSchedules || [])
-      const actualHours = computeActualHours(
-        student.id,
-        week,
-        allCheckIns || [],
-        todayStr,
-        now,
-      )
+      const exclLeave = computeActualHoursExclLeave(student.id, week, allCheckIns || [], todayStr, now)
+      const leaveHours = computeLeaveHours(student.id, week, allSchedules || [], allLeave || [])
+      const inclLeave = Math.round((exclLeave + leaveHours) * 10) / 10
+      const onSchedule = computeHoursOnSchedule(student.id, week, allSchedules || [], allCheckIns || [], todayStr, now)
       return {
         monday: week.monday,
         label: week.label,
         shortLabel: week.shortLabel,
+        isCurrent: week.isCurrent,
         scheduledHours: Math.round(scheduledHours * 10) / 10,
-        actualHours,
-        met16h: actualHours >= 16,
+        actualHoursInclLeave: inclLeave,
+        actualHoursOnSchedule: onSchedule,
+        actualHoursExclLeave: exclLeave,
+        met16h: inclLeave >= 16,
         adherencePct:
           scheduledHours > 0
-            ? Math.min(100, Math.round((actualHours / scheduledHours) * 100))
+            ? Math.min(100, Math.round((onSchedule / scheduledHours) * 100))
             : null,
-        isCurrent: week.isCurrent,
       }
     })
 
-    const weeksWithSchedule = weekRows.filter(w => w.scheduledHours > 0)
-    const avgActualHours =
-      weeksWithSchedule.length > 0
-        ? Math.round(
-            (weeksWithSchedule.reduce((s, w) => s + w.actualHours, 0) /
-              weeksWithSchedule.length) *
-              10,
-          ) / 10
-        : 0
-
-    studentHistories.push({
+    const withSched = weekRows.filter(w => w.scheduledHours > 0)
+    return {
       id: student.id,
       full_name: student.full_name,
       coach_id: student.coach_id,
@@ -335,15 +410,18 @@ export default async function VerzuimDashboard() {
       class_code: student.class_code,
       cohort: student.cohort,
       weeks: weekRows,
-      avgActualHours,
+      avgInclLeave: avg(withSched.map(w => w.actualHoursInclLeave)),
+      avgExclLeave: avg(withSched.map(w => w.actualHoursExclLeave)),
+      avgOnSchedule: avg(withSched.map(w => w.actualHoursOnSchedule)),
+      avgScheduled: avg(withSched.map(w => w.scheduledHours)),
       weeksMet16h: weekRows.filter(w => w.met16h).length,
-      totalWeeksWithSchedule: weeksWithSchedule.length,
-    })
-  }
+      totalWeeksWithSchedule: withSched.length,
+    }
+  })
 
   return (
     <AttendanceDashboard
-      todayStudents={todayStudents}
+      dayOverviews={dayOverviews}
       studentHistories={studentHistories}
       pendingLeaveCount={pendingLeave?.length ?? 0}
       pendingScheduleCount={pendingScheduleCount ?? 0}

@@ -1,63 +1,29 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { AlertCircle } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { AlertCircle, Pencil } from 'lucide-react'
+import { updateCheckInTimes, createManualCheckIn } from '@/app/verzuim/actions'
+import type { DayStudent, DayOverview, WeekRow, StudentHistory, TodayStatus } from '@/app/verzuim/dashboard/page'
 
-// ---- Types ----
-type TodayStatus = 'aanwezig' | 'uitgecheck' | 'te-laat' | 'afwezig' | 'verlof' | 'verwacht'
+// ---- Config ----
+type HistoryMetric = 'inclLeave' | 'exclLeave' | 'onSchedule' | 'scheduled'
 
-interface TodayStudent {
-  id: string
-  full_name: string
-  coach_name: string | null
-  class_code: string | null
-  scheduled_start: string
-  scheduled_end: string
-  scheduled_hours: number
-  check_in_time: string | null
-  check_out_time: string | null
-  actual_hours: number
-  status: TodayStatus
+const METRIC_LABELS: Record<HistoryMetric, string> = {
+  inclLeave: 'Incl. verlof',
+  exclLeave: 'Excl. verlof',
+  onSchedule: 'V/h rooster',
+  scheduled: 'Gepland',
 }
 
-interface WeekRow {
-  monday: string
-  label: string
-  shortLabel: string
-  scheduledHours: number
-  actualHours: number
-  met16h: boolean
-  adherencePct: number | null
-  isCurrent: boolean
-}
-
-interface StudentHistory {
-  id: string
-  full_name: string
-  coach_id: string | null
-  coach_name: string | null
-  class_code: string | null
-  cohort: string | null
-  weeks: WeekRow[]
-  avgActualHours: number
-  weeksMet16h: number
-  totalWeeksWithSchedule: number
-}
-
-interface Props {
-  todayStudents: TodayStudent[]
-  studentHistories: StudentHistory[]
-  pendingLeaveCount: number
-  pendingScheduleCount: number
-  nowLabel: string
-}
-
-// ---- Helpers ----
 const STATUS_LABEL: Record<TodayStatus, string> = {
   aanwezig: 'Aanwezig',
   uitgecheck: 'Uitgecheck',
@@ -76,16 +42,33 @@ const STATUS_BADGE: Record<TodayStatus, string> = {
   verwacht: 'bg-blue-50 text-blue-600 hover:bg-blue-50',
 }
 
+// ---- Helpers ----
 function fmtTime(iso: string | null): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
 }
 
-function weekCellClass(w: WeekRow): string {
-  if (w.scheduledHours === 0) return ''
-  if (w.met16h) return 'bg-green-100 text-green-800'
-  if (w.actualHours >= 12) return 'bg-yellow-100 text-yellow-800'
-  if (w.actualHours > 0) return 'bg-red-100 text-red-800'
+function isoToTimeInput(iso: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
+}
+
+function metricValue(w: WeekRow, m: HistoryMetric): number {
+  switch (m) {
+    case 'inclLeave': return w.actualHoursInclLeave
+    case 'exclLeave': return w.actualHoursExclLeave
+    case 'onSchedule': return w.actualHoursOnSchedule
+    case 'scheduled': return w.scheduledHours
+  }
+}
+
+function weekCellClass(value: number, scheduled: number, metric: HistoryMetric): string {
+  if (scheduled === 0) return ''
+  if (metric === 'scheduled') return 'bg-blue-50 text-blue-700'
+  if (value >= 16) return 'bg-green-100 text-green-800'
+  if (value >= 12) return 'bg-yellow-100 text-yellow-800'
+  if (value > 0) return 'bg-red-100 text-red-800'
   return 'bg-red-50 text-red-500'
 }
 
@@ -108,6 +91,114 @@ function StatCard({ label, value, color }: { label: string; value: number; color
         <p className={`text-2xl font-bold tabular-nums ${color ?? ''}`}>{value}</p>
       </CardContent>
     </Card>
+  )
+}
+
+interface EditState {
+  studentId: string
+  studentName: string
+  date: string
+  dayLabel: string
+  checkInId: string | null
+  checkInTime: string   // "HH:MM"
+  checkOutTime: string  // "HH:MM" or ""
+  scheduledStart: string
+  scheduledEnd: string
+}
+
+function CheckInEditDialog({
+  state,
+  onClose,
+}: {
+  state: EditState
+  onClose: () => void
+}) {
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+  const [checkIn, setCheckIn] = useState(state.checkInTime)
+  const [checkOut, setCheckOut] = useState(state.checkOutTime)
+  const [error, setError] = useState<string | null>(null)
+
+  function handleSave() {
+    startTransition(async () => {
+      setError(null)
+      const outVal = checkOut.trim() || null
+      let result: { error?: string }
+      if (state.checkInId) {
+        result = await updateCheckInTimes(state.checkInId, state.date, checkIn, outVal)
+      } else {
+        result = await createManualCheckIn(
+          state.studentId,
+          state.date,
+          checkIn,
+          outVal,
+          state.scheduledStart,
+          state.scheduledEnd,
+        )
+      }
+      if (result.error) {
+        setError(result.error)
+      } else {
+        onClose()
+        router.refresh()
+      }
+    })
+  }
+
+  return (
+    <Dialog open onOpenChange={open => !open && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Check-in aanpassen</DialogTitle>
+        </DialogHeader>
+
+        <div className="text-sm text-muted-foreground space-y-0.5">
+          <p className="font-medium text-foreground">{state.studentName}</p>
+          <p>{state.dayLabel}</p>
+          <p>Rooster: {state.scheduledStart.substring(0, 5)} – {state.scheduledEnd.substring(0, 5)}</p>
+        </div>
+
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label>Inchecktijd</Label>
+            <Input
+              type="time"
+              value={checkIn}
+              onChange={e => setCheckIn(e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>
+              Uittijd
+              <span className="text-muted-foreground font-normal ml-1">(optioneel)</span>
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                type="time"
+                value={checkOut}
+                onChange={e => setCheckOut(e.target.value)}
+              />
+              {checkOut && (
+                <Button variant="ghost" size="sm" onClick={() => setCheckOut('')} className="shrink-0">
+                  Wissen
+                </Button>
+              )}
+            </div>
+          </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={isPending}>
+            Annuleren
+          </Button>
+          <Button onClick={handleSave} disabled={isPending || !checkIn}>
+            {isPending ? 'Opslaan…' : 'Opslaan'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -140,28 +231,29 @@ function GroupTable({
                 </th>
               ))}
               <th className="px-3 py-2 text-center text-xs font-medium text-muted-foreground min-w-[70px]">
-                Gem. uren
+                Gem. incl. verlof
               </th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {groups.map(({ key, label, students }) => {
-              const totalStudents = students.length
               const avgHours =
-                totalStudents > 0
+                students.length > 0
                   ? Math.round(
-                      (students.reduce((s, st) => s + st.avgActualHours, 0) / totalStudents) * 10,
+                      (students.reduce((s, st) => s + st.avgInclLeave, 0) / students.length) * 10,
                     ) / 10
                   : 0
 
               return (
                 <tr key={key} className="hover:bg-muted/20">
                   <td className="px-4 py-2 font-medium">{label}</td>
-                  <td className="px-3 py-2 text-center text-xs text-muted-foreground">{totalStudents}</td>
+                  <td className="px-3 py-2 text-center text-xs text-muted-foreground">
+                    {students.length}
+                  </td>
                   {weeks.map((_, wi) => {
-                    const withSchedule = students.filter(s => (s.weeks[wi]?.scheduledHours ?? 0) > 0)
+                    const withSched = students.filter(s => (s.weeks[wi]?.scheduledHours ?? 0) > 0)
                     const met16h = students.filter(s => s.weeks[wi]?.met16h).length
-                    const total = withSchedule.length
+                    const total = withSched.length
                     if (total === 0) {
                       return (
                         <td key={wi} className="px-2 py-2 text-center text-xs text-muted-foreground">
@@ -173,7 +265,7 @@ function GroupTable({
                       <td key={wi} className="px-2 py-2 text-center">
                         <span
                           className={`inline-block rounded px-1.5 py-0.5 text-xs tabular-nums ${groupCellClass(met16h, total)}`}
-                          title={`${met16h} van ${total} studenten haalden 16u`}
+                          title={`${met16h} van ${total} studenten ≥ 16u (incl. verlof)`}
                         >
                           {met16h}/{total}
                         </span>
@@ -193,17 +285,45 @@ function GroupTable({
   )
 }
 
+// ---- Props ----
+interface Props {
+  dayOverviews: DayOverview[]
+  studentHistories: StudentHistory[]
+  pendingLeaveCount: number
+  pendingScheduleCount: number
+  nowLabel: string
+}
+
 // ---- Main component ----
 export function AttendanceDashboard({
-  todayStudents,
+  dayOverviews,
   studentHistories,
   pendingLeaveCount,
   pendingScheduleCount,
   nowLabel,
 }: Props) {
+  const [selectedDayIdx, setSelectedDayIdx] = useState(0)
+  const [editState, setEditState] = useState<EditState | null>(null)
   const [search, setSearch] = useState('')
   const [filterCoach, setFilterCoach] = useState('all')
   const [filterClass, setFilterClass] = useState('all')
+  const [historyMetric, setHistoryMetric] = useState<HistoryMetric>('inclLeave')
+
+  const currentDay = dayOverviews[selectedDayIdx] ?? dayOverviews[0]
+
+  const todayStats = useMemo(() => {
+    const c = { ingepland: 0, aanwezig: 0, uitgecheck: 0, teLaat: 0, afwezig: 0, verlof: 0, verwacht: 0 }
+    c.ingepland = currentDay.students.length
+    for (const s of currentDay.students) {
+      if (s.status === 'aanwezig') c.aanwezig++
+      else if (s.status === 'uitgecheck') c.uitgecheck++
+      else if (s.status === 'te-laat') c.teLaat++
+      else if (s.status === 'afwezig') c.afwezig++
+      else if (s.status === 'verlof') c.verlof++
+      else if (s.status === 'verwacht') c.verwacht++
+    }
+    return c
+  }, [currentDay])
 
   const coaches = useMemo(() => {
     const map: Record<string, string> = {}
@@ -227,20 +347,6 @@ export function AttendanceDashboard({
       return true
     })
   }, [studentHistories, search, filterCoach, filterClass])
-
-  const todayStats = useMemo(() => {
-    const c = { ingepland: 0, aanwezig: 0, uitgecheck: 0, teLaat: 0, afwezig: 0, verlof: 0, verwacht: 0 }
-    c.ingepland = todayStudents.length
-    for (const s of todayStudents) {
-      if (s.status === 'aanwezig') c.aanwezig++
-      else if (s.status === 'uitgecheck') c.uitgecheck++
-      else if (s.status === 'te-laat') c.teLaat++
-      else if (s.status === 'afwezig') c.afwezig++
-      else if (s.status === 'verlof') c.verlof++
-      else if (s.status === 'verwacht') c.verwacht++
-    }
-    return c
-  }, [todayStudents])
 
   const coachGroups = useMemo(() => {
     const map: Record<string, { coachName: string; students: StudentHistory[] }> = {}
@@ -266,11 +372,26 @@ export function AttendanceDashboard({
       .map(([key, students]) => ({ key, label: key === '__geen__' ? 'Geen klas' : key, students }))
   }, [studentHistories])
 
-  // Use week metadata from first student (all students share same week structure)
   const weeks: WeekRow[] = studentHistories[0]?.weeks ?? []
+
+  function openEdit(s: DayStudent, day: DayOverview) {
+    setEditState({
+      studentId: s.id,
+      studentName: s.full_name,
+      date: day.date,
+      dayLabel: day.dayLabel,
+      checkInId: s.check_in_id,
+      checkInTime: isoToTimeInput(s.check_in_time) || s.scheduled_start.substring(0, 5),
+      checkOutTime: isoToTimeInput(s.check_out_time),
+      scheduledStart: s.scheduled_start,
+      scheduledEnd: s.scheduled_end,
+    })
+  }
 
   return (
     <div className="space-y-4">
+      {editState && <CheckInEditDialog state={editState} onClose={() => setEditState(null)} />}
+
       <div>
         <h1 className="text-2xl font-bold">Verzuimoverzicht</h1>
         <p className="text-sm text-muted-foreground mt-0.5">{nowLabel}</p>
@@ -286,6 +407,23 @@ export function AttendanceDashboard({
 
         {/* ── VANDAAG ── */}
         <TabsContent value="vandaag" className="space-y-4 mt-4">
+          {/* Day selector */}
+          {dayOverviews.length > 1 && (
+            <div className="flex flex-wrap gap-2">
+              {dayOverviews.map((d, i) => (
+                <Button
+                  key={d.date}
+                  variant={i === selectedDayIdx ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSelectedDayIdx(i)}
+                >
+                  {i === 0 ? 'Vandaag' : i === 1 ? 'Gisteren' : d.dayLabel}
+                </Button>
+              ))}
+            </div>
+          )}
+
+          {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <StatCard label="Ingepland" value={todayStats.ingepland} />
             <StatCard label="Aanwezig" value={todayStats.aanwezig} color="text-green-600" />
@@ -328,16 +466,16 @@ export function AttendanceDashboard({
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">
-                Studenten vandaag
+                {currentDay.dayLabel}
                 <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  ({todayStudents.length} ingepland)
+                  ({currentDay.students.length} ingepland)
                 </span>
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
-              {todayStudents.length === 0 ? (
+              {currentDay.students.length === 0 ? (
                 <p className="px-6 py-8 text-sm text-muted-foreground text-center">
-                  Geen studenten ingepland vandaag.
+                  Geen studenten ingepland op deze dag.
                 </p>
               ) : (
                 <table className="w-full text-sm">
@@ -365,10 +503,11 @@ export function AttendanceDashboard({
                       <th className="text-center px-3 py-2 font-medium text-xs text-muted-foreground">
                         Status
                       </th>
+                      <th className="w-8" />
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {todayStudents.map(s => (
+                    {currentDay.students.map(s => (
                       <tr key={s.id} className="hover:bg-muted/20">
                         <td className="px-4 py-2 font-medium">{s.full_name}</td>
                         <td className="px-4 py-2 text-xs text-muted-foreground hidden sm:table-cell">
@@ -394,6 +533,15 @@ export function AttendanceDashboard({
                             {STATUS_LABEL[s.status]}
                           </Badge>
                         </td>
+                        <td className="px-2 py-2 text-center">
+                          <button
+                            onClick={() => openEdit(s, currentDay)}
+                            className="text-muted-foreground hover:text-foreground transition-colors"
+                            title="Check-in aanpassen"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -405,6 +553,7 @@ export function AttendanceDashboard({
 
         {/* ── PER STUDENT ── */}
         <TabsContent value="student" className="space-y-4 mt-4">
+          {/* Filters */}
           <div className="flex flex-wrap gap-3">
             <Input
               placeholder="Zoek student..."
@@ -420,9 +569,7 @@ export function AttendanceDashboard({
                 <SelectContent>
                   <SelectItem value="all">Alle coaches</SelectItem>
                   {coaches.map(([id, name]) => (
-                    <SelectItem key={id} value={id}>
-                      {name}
-                    </SelectItem>
+                    <SelectItem key={id} value={id}>{name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -435,15 +582,30 @@ export function AttendanceDashboard({
                 <SelectContent>
                   <SelectItem value="all">Alle klassen</SelectItem>
                   {classes.map(c => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             )}
           </div>
 
+          {/* Metric selector */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-muted-foreground">Weergave:</span>
+            {(Object.keys(METRIC_LABELS) as HistoryMetric[]).map(m => (
+              <Button
+                key={m}
+                variant={historyMetric === m ? 'default' : 'outline'}
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setHistoryMetric(m)}
+              >
+                {METRIC_LABELS[m]}
+              </Button>
+            ))}
+          </div>
+
+          {/* Matrix */}
           <Card>
             <CardContent className="p-0 overflow-x-auto">
               <table className="w-full text-sm">
@@ -452,7 +614,7 @@ export function AttendanceDashboard({
                     <th className="text-left px-4 py-2 font-medium sticky left-0 bg-muted/50 min-w-[180px]">
                       Student
                     </th>
-                    <th className="text-left px-4 py-2 font-medium text-xs text-muted-foreground min-w-[120px] hidden sm:table-cell">
+                    <th className="text-left px-4 py-2 font-medium text-xs text-muted-foreground min-w-[110px] hidden sm:table-cell">
                       Coach
                     </th>
                     {weeks.map(w => (
@@ -478,58 +640,69 @@ export function AttendanceDashboard({
                 <tbody className="divide-y">
                   {filteredStudents.length === 0 ? (
                     <tr>
-                      <td
-                        colSpan={3 + weeks.length}
-                        className="px-4 py-8 text-center text-sm text-muted-foreground"
-                      >
+                      <td colSpan={3 + weeks.length} className="px-4 py-8 text-center text-sm text-muted-foreground">
                         Geen studenten gevonden.
                       </td>
                     </tr>
                   ) : (
-                    filteredStudents.map(s => (
-                      <tr key={s.id} className="hover:bg-muted/20">
-                        <td className="px-4 py-2 font-medium sticky left-0 bg-background">
-                          {s.full_name}
-                        </td>
-                        <td className="px-4 py-2 text-xs text-muted-foreground hidden sm:table-cell">
-                          {s.coach_name ?? '—'}
-                        </td>
-                        {s.weeks.map(w => (
-                          <td key={w.monday} className="px-2 py-2 text-center">
-                            {w.scheduledHours === 0 ? (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            ) : (
+                    filteredStudents.map(s => {
+                      const avgVal =
+                        historyMetric === 'inclLeave'
+                          ? s.avgInclLeave
+                          : historyMetric === 'exclLeave'
+                            ? s.avgExclLeave
+                            : historyMetric === 'onSchedule'
+                              ? s.avgOnSchedule
+                              : s.avgScheduled
+
+                      return (
+                        <tr key={s.id} className="hover:bg-muted/20">
+                          <td className="px-4 py-2 font-medium sticky left-0 bg-background">
+                            {s.full_name}
+                          </td>
+                          <td className="px-4 py-2 text-xs text-muted-foreground hidden sm:table-cell">
+                            {s.coach_name ?? '—'}
+                          </td>
+                          {s.weeks.map(w => {
+                            const val = metricValue(w, historyMetric)
+                            return (
+                              <td key={w.monday} className="px-2 py-2 text-center">
+                                {w.scheduledHours === 0 ? (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                ) : (
+                                  <span
+                                    className={`inline-block rounded px-1.5 py-0.5 text-xs font-mono tabular-nums ${weekCellClass(val, w.scheduledHours, historyMetric)}`}
+                                    title={`Gepland: ${w.scheduledHours}u | Incl. verlof: ${w.actualHoursInclLeave}u | V/h rooster: ${w.actualHoursOnSchedule}u | Excl. verlof: ${w.actualHoursExclLeave}u${w.adherencePct !== null ? ` | Roosteradherentie: ${w.adherencePct}%` : ''}`}
+                                  >
+                                    {val}u
+                                  </span>
+                                )}
+                              </td>
+                            )
+                          })}
+                          <td className="px-3 py-2 text-center text-xs tabular-nums font-medium">
+                            {s.totalWeeksWithSchedule > 0 ? `${avgVal}u` : '—'}
+                          </td>
+                          <td className="px-3 py-2 text-center text-xs">
+                            {s.totalWeeksWithSchedule > 0 ? (
                               <span
-                                className={`inline-block rounded px-1.5 py-0.5 text-xs font-mono tabular-nums ${weekCellClass(w)}`}
-                                title={`Ingepland: ${w.scheduledHours}u | Actueel: ${w.actualHours}u${w.adherencePct !== null ? ` | ${w.adherencePct}%` : ''}`}
+                                className={
+                                  s.weeksMet16h === s.totalWeeksWithSchedule
+                                    ? 'text-green-600 font-medium'
+                                    : s.weeksMet16h === 0
+                                      ? 'text-red-600'
+                                      : 'text-orange-600'
+                                }
                               >
-                                {w.actualHours}u
+                                {s.weeksMet16h}/{s.totalWeeksWithSchedule}
                               </span>
+                            ) : (
+                              '—'
                             )}
                           </td>
-                        ))}
-                        <td className="px-3 py-2 text-center text-xs tabular-nums font-medium">
-                          {s.totalWeeksWithSchedule > 0 ? `${s.avgActualHours}u` : '—'}
-                        </td>
-                        <td className="px-3 py-2 text-center text-xs">
-                          {s.totalWeeksWithSchedule > 0 ? (
-                            <span
-                              className={
-                                s.weeksMet16h === s.totalWeeksWithSchedule
-                                  ? 'text-green-600 font-medium'
-                                  : s.weeksMet16h === 0
-                                    ? 'text-red-600'
-                                    : 'text-orange-600'
-                              }
-                            >
-                              {s.weeksMet16h}/{s.totalWeeksWithSchedule}
-                            </span>
-                          ) : (
-                            '—'
-                          )}
-                        </td>
-                      </tr>
-                    ))
+                        </tr>
+                      )
+                    })
                   )}
                 </tbody>
               </table>
@@ -537,21 +710,34 @@ export function AttendanceDashboard({
           </Card>
 
           <div className="flex gap-4 text-xs text-muted-foreground flex-wrap">
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block w-6 h-4 rounded bg-green-100 border border-green-200" />
-              ≥ 16u
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block w-6 h-4 rounded bg-yellow-100 border border-yellow-200" />
-              12–16u
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block w-6 h-4 rounded bg-red-100 border border-red-200" />
-              &lt; 12u
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block w-6 h-4 rounded bg-red-50 border border-red-100" />
-              Ingepland, 0u aanwezig
+            {historyMetric !== 'scheduled' && (
+              <>
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-6 h-4 rounded bg-green-100 border border-green-200" />
+                  ≥ 16u
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-6 h-4 rounded bg-yellow-100 border border-yellow-200" />
+                  12–16u
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-6 h-4 rounded bg-red-100 border border-red-200" />
+                  &lt; 12u
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-6 h-4 rounded bg-red-50 border border-red-100" />
+                  0u (ingepland)
+                </span>
+              </>
+            )}
+            {historyMetric === 'scheduled' && (
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-6 h-4 rounded bg-blue-50 border border-blue-200" />
+                Geplande uren
+              </span>
+            )}
+            <span>
+              Hover over een cel voor alle 4 waarden. 16h ✓ = weken incl. verlof ≥ 16u.
             </span>
           </div>
         </TabsContent>
@@ -559,7 +745,7 @@ export function AttendanceDashboard({
         {/* ── PER COACHGROEP ── */}
         <TabsContent value="coach" className="mt-4 space-y-3">
           <p className="text-sm text-muted-foreground">
-            Elke cel toont hoeveel studenten ≥ 16u haalden van het totaal ingeroosterde studenten in die week.
+            Elke cel toont hoeveel studenten ≥ 16u haalden (incl. verlof) van het totaal ingeroosterde studenten.
           </p>
           <GroupTable groups={coachGroups} weeks={weeks} />
         </TabsContent>
@@ -567,7 +753,7 @@ export function AttendanceDashboard({
         {/* ── PER KLAS ── */}
         <TabsContent value="klas" className="mt-4 space-y-3">
           <p className="text-sm text-muted-foreground">
-            Elke cel toont hoeveel studenten ≥ 16u haalden van het totaal ingeroosterde studenten in die week.
+            Elke cel toont hoeveel studenten ≥ 16u haalden (incl. verlof) van het totaal ingeroosterde studenten.
           </p>
           <GroupTable groups={classGroups} weeks={weeks} />
         </TabsContent>
