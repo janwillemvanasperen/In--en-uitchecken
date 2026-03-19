@@ -126,7 +126,13 @@ export function ScheduleEditor({
     if (result.error) {
       setError(result.error)
     } else {
-      setSuccess(isEditing ? 'Rooster bijgewerkt!' : 'Rooster ingediend! Wacht op goedkeuring van je docent.')
+      setSuccess(
+        result.autoApproved
+          ? 'Rooster goedgekeurd!'
+          : isEditing
+          ? 'Rooster bijgewerkt! Wacht op goedkeuring van je docent.'
+          : 'Rooster ingediend! Wacht op goedkeuring van je docent.'
+      )
       router.refresh()
     }
 

@@ -266,13 +266,17 @@ export async function submitSchedule(data: ScheduleSubmissionInput) {
     // Generate submission group
     const submissionGroup = crypto.randomUUID()
 
+    // Auto-approve when hours exactly equal the minimum
+    const autoApprove = Math.abs(totalHours - minimumHours) < 0.01
+    const scheduleStatus = autoApprove ? 'approved' : 'pending'
+
     // Insert schedule entries
     const scheduleRows = activeEntries.map(entry => ({
       user_id: user.id,
       day_of_week: entry.day_of_week,
       start_time: entry.start_time,
       end_time: entry.end_time,
-      status: 'pending' as const,
+      status: scheduleStatus as 'approved' | 'pending',
       valid_from: validFrom,
       valid_until: validUntil,
       submission_group: submissionGroup,
@@ -302,7 +306,7 @@ export async function submitSchedule(data: ScheduleSubmissionInput) {
     revalidatePath('/student/schedule')
     revalidatePath('/student/dashboard')
 
-    return { success: true }
+    return { success: true, autoApproved: autoApprove }
   } catch (error) {
     console.error('Schedule submit error:', error)
     return { error: 'Er is een onverwachte fout opgetreden' }
@@ -380,13 +384,17 @@ export async function updatePendingSchedule(data: ScheduleSubmissionInput) {
       return { error: 'Rooster bijwerken mislukt. Probeer het opnieuw.' }
     }
 
+    // Auto-approve when hours exactly equal the minimum
+    const autoApprove = Math.abs(totalHours - minimumHours) < 0.01
+    const scheduleStatus = autoApprove ? 'approved' : 'pending'
+
     // Insert new entries
     const scheduleRows = activeEntries.map(entry => ({
       user_id: user.id,
       day_of_week: entry.day_of_week,
       start_time: entry.start_time,
       end_time: entry.end_time,
-      status: 'pending' as const,
+      status: scheduleStatus as 'approved' | 'pending',
       valid_from: validFrom,
       valid_until: validUntil,
       submission_group: submissionGroup,
@@ -416,7 +424,7 @@ export async function updatePendingSchedule(data: ScheduleSubmissionInput) {
     revalidatePath('/student/schedule')
     revalidatePath('/student/dashboard')
 
-    return { success: true }
+    return { success: true, autoApproved: autoApprove }
   } catch (error) {
     console.error('Schedule update error:', error)
     return { error: 'Er is een onverwachte fout opgetreden' }
