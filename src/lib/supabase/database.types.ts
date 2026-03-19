@@ -76,6 +76,29 @@ export type Database = {
           created_at?: string
         }
       }
+      coach_schedules: {
+        Row: {
+          id: string
+          coach_id: string
+          day_of_week: number
+          start_time: string
+          end_time: string
+        }
+        Insert: {
+          id?: string
+          coach_id: string
+          day_of_week: number
+          start_time?: string
+          end_time?: string
+        }
+        Update: {
+          id?: string
+          coach_id?: string
+          day_of_week?: number
+          start_time?: string
+          end_time?: string
+        }
+      }
       coach_notes: {
         Row: {
           id: string

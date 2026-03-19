@@ -48,6 +48,8 @@ interface ScheduleEditorProps {
   existingPending: Schedule[] | null
   pushRequest?: PushRequest | null
   dayCapacity?: Record<number, DayCapacityInfo>
+  coachScheduleDays?: number[] | null
+  coachName?: string | null
 }
 
 function buildInitialEntries(
@@ -79,6 +81,8 @@ export function ScheduleEditor({
   existingPending,
   pushRequest,
   dayCapacity,
+  coachScheduleDays,
+  coachName,
 }: Omit<ScheduleEditorProps, 'defaultStartTime'> & { defaultStartTime?: string }) {
   const router = useRouter()
   const isEditing = !!existingPending && existingPending.length > 0
@@ -203,65 +207,75 @@ export function ScheduleEditor({
             const cap = dayCapacity?.[entry.day_of_week]
             const isFull = cap ? cap.used >= cap.max : false
             const isDisabledByCapacity = isFull && !entry.active
+            const coachAbsent = entry.active && coachScheduleDays != null && !coachScheduleDays.includes(entry.day_of_week)
 
             return (
-              <div
-                key={entry.day_of_week}
-                className={`flex items-center gap-3 rounded-lg border p-3 transition-colors ${
-                  isDisabledByCapacity
-                    ? 'bg-muted/50 opacity-60 border-red-200'
-                    : entry.active
-                    ? 'bg-background'
-                    : 'bg-muted/50 opacity-60'
-                }`}
-              >
-                <label className={`flex items-center gap-2 min-w-[120px] ${isDisabledByCapacity ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-                  <input
-                    type="checkbox"
-                    checked={entry.active}
-                    disabled={isDisabledByCapacity}
-                    onChange={(e) => updateEntry(index, 'active', e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 disabled:cursor-not-allowed"
-                  />
-                  <span className="text-sm font-medium">{DAY_NAMES[entry.day_of_week]}</span>
-                </label>
+              <div key={entry.day_of_week} className="space-y-1">
+                <div
+                  className={`flex items-center gap-3 rounded-lg border p-3 transition-colors ${
+                    isDisabledByCapacity
+                      ? 'bg-muted/50 opacity-60 border-red-200'
+                      : coachAbsent
+                      ? 'border-yellow-400 bg-yellow-50/50'
+                      : entry.active
+                      ? 'bg-background'
+                      : 'bg-muted/50 opacity-60'
+                  }`}
+                >
+                  <label className={`flex items-center gap-2 min-w-[120px] ${isDisabledByCapacity ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                    <input
+                      type="checkbox"
+                      checked={entry.active}
+                      disabled={isDisabledByCapacity}
+                      onChange={(e) => updateEntry(index, 'active', e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 disabled:cursor-not-allowed"
+                    />
+                    <span className="text-sm font-medium">{DAY_NAMES[entry.day_of_week]}</span>
+                  </label>
 
-                {entry.active && (
-                  <>
-                    <span className="text-sm font-mono tabular-nums text-muted-foreground w-[60px] text-center">
-                      {FIXED_START_TIME}
+                  {entry.active && (
+                    <>
+                      <span className="text-sm font-mono tabular-nums text-muted-foreground w-[60px] text-center">
+                        {FIXED_START_TIME}
+                      </span>
+                      <span className="text-muted-foreground">—</span>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs text-muted-foreground sr-only">Eindtijd</Label>
+                        <Select
+                          value={entry.end_time}
+                          onValueChange={(val) => updateEntry(index, 'end_time', val)}
+                        >
+                          <SelectTrigger className="w-[100px] h-9">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {END_TIME_OPTIONS.map((t) => (
+                              <SelectItem key={t} value={t}>{t}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <span className="text-sm text-muted-foreground ml-auto">
+                        {calculateDayHours(entry).toFixed(1)}u
+                      </span>
+                    </>
+                  )}
+
+                  {!entry.active && isDisabledByCapacity && cap && (
+                    <span className="text-sm text-red-500 ml-auto">
+                      Volgeboekt ({cap.used}/{cap.max})
                     </span>
-                    <span className="text-muted-foreground">—</span>
-                    <div className="flex items-center gap-2">
-                      <Label className="text-xs text-muted-foreground sr-only">Eindtijd</Label>
-                      <Select
-                        value={entry.end_time}
-                        onValueChange={(val) => updateEntry(index, 'end_time', val)}
-                      >
-                        <SelectTrigger className="w-[100px] h-9">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {END_TIME_OPTIONS.map((t) => (
-                            <SelectItem key={t} value={t}>{t}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <span className="text-sm text-muted-foreground ml-auto">
-                      {calculateDayHours(entry).toFixed(1)}u
-                    </span>
-                  </>
-                )}
+                  )}
 
-                {!entry.active && isDisabledByCapacity && cap && (
-                  <span className="text-sm text-red-500 ml-auto">
-                    Volgeboekt ({cap.used}/{cap.max})
-                  </span>
-                )}
+                  {!entry.active && !isDisabledByCapacity && (
+                    <span className="text-sm text-muted-foreground ml-auto">Vrij</span>
+                  )}
+                </div>
 
-                {!entry.active && !isDisabledByCapacity && (
-                  <span className="text-sm text-muted-foreground ml-auto">Vrij</span>
+                {coachAbsent && (
+                  <p className="text-xs text-yellow-700 px-1">
+                    ⚠ {coachName ? `${coachName} is` : 'Je coach is'} niet aanwezig op deze dag.
+                  </p>
                 )}
               </div>
             )

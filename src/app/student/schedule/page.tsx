@@ -73,6 +73,27 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
     }
   }
 
+  // Fetch coach schedule for this student's coach
+  const { data: userRow } = await supabase
+    .from('users')
+    .select('coach_id')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  const coachScheduleDays: number[] = []
+  let coachName: string | null = null
+
+  if (userRow?.coach_id) {
+    const [{ data: coachData }, { data: coachScheduleRows }] = await Promise.all([
+      adminClient.from('coaches').select('name').eq('id', userRow.coach_id).maybeSingle(),
+      adminClient.from('coach_schedules').select('day_of_week').eq('coach_id', userRow.coach_id),
+    ])
+    coachName = coachData?.name ?? null
+    for (const row of coachScheduleRows || []) {
+      coachScheduleDays.push(row.day_of_week)
+    }
+  }
+
   // Open schedule push request for this student
   const { data: openPushRecipient } = await adminClient
     .from('schedule_push_recipients')
@@ -143,6 +164,8 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
           periodWeeks={periodWeeks}
           existingPending={pendingSchedule}
           dayCapacity={dayCapacity}
+          coachScheduleDays={coachScheduleDays.length > 0 ? coachScheduleDays : null}
+          coachName={coachName}
           pushRequest={openPush ? {
             id: openPush.id,
             valid_from: openPush.valid_from,

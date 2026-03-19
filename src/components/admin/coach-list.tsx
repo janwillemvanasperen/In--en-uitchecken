@@ -15,26 +15,31 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Loader2, Trash2, Pencil, Plus, Users, Power } from 'lucide-react'
+import { Loader2, Trash2, Pencil, Plus, Users, Power, CalendarDays } from 'lucide-react'
 import { createCoach, updateCoach, deleteCoach } from '@/app/admin/actions'
+import { CoachScheduleDialog } from '@/components/admin/coach-schedule-dialog'
 import type { Coach } from '@/types'
 
 type CoachUser = { id: string; full_name: string }
+type CoachScheduleEntry = { day_of_week: number; start_time: string; end_time: string }
 
 export function CoachList({
   coaches,
   studentCounts,
   coachUsers,
+  coachSchedules,
 }: {
   coaches: Coach[]
   studentCounts: Record<string, number>
   coachUsers: CoachUser[]
+  coachSchedules: Record<string, CoachScheduleEntry[]>
 }) {
   const [newName, setNewName] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [editUserId, setEditUserId] = useState<string>('')
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [scheduleCoachId, setScheduleCoachId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -229,6 +234,14 @@ export function CoachList({
                           <Button
                             variant="ghost"
                             size="sm"
+                            onClick={() => setScheduleCoachId(coach.id)}
+                            title="Werkrooster instellen"
+                          >
+                            <CalendarDays className="h-4 w-4 text-blue-600" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => handleToggleActive(coach.id, coach.active)}
                             disabled={isLoading}
                             title={coach.active ? 'Deactiveren' : 'Activeren'}
@@ -259,6 +272,21 @@ export function CoachList({
         {' · '}
         {coaches.filter(c => c.active).length} actief
       </p>
+
+      {/* Coach schedule dialog */}
+      {scheduleCoachId && (() => {
+        const coach = coaches.find(c => c.id === scheduleCoachId)
+        if (!coach) return null
+        return (
+          <CoachScheduleDialog
+            coachId={coach.id}
+            coachName={coach.name}
+            existingSchedule={coachSchedules[coach.id] || []}
+            open={!!scheduleCoachId}
+            onOpenChange={(open) => { if (!open) setScheduleCoachId(null) }}
+          />
+        )
+      })()}
 
       {/* Delete confirmation dialog */}
       <Dialog open={!!deletingId} onOpenChange={() => setDeletingId(null)}>

@@ -605,6 +605,42 @@ export async function deleteCoach(id: string) {
   }
 }
 
+// ==================== COACH SCHEDULES ====================
+
+export async function updateCoachSchedule(
+  coachId: string,
+  entries: Array<{ day_of_week: number; start_time: string; end_time: string }>
+) {
+  try {
+    await requireAdmin()
+    const adminClient = createAdminClient()
+
+    // Delete existing entries for this coach
+    const { error: deleteError } = await adminClient
+      .from('coach_schedules')
+      .delete()
+      .eq('coach_id', coachId)
+
+    if (deleteError) return { error: `Opslaan mislukt: ${deleteError.message}` }
+
+    // Insert new entries
+    if (entries.length > 0) {
+      const { error: insertError } = await adminClient
+        .from('coach_schedules')
+        .insert(entries.map(e => ({ coach_id: coachId, ...e })))
+
+      if (insertError) return { error: `Opslaan mislukt: ${insertError.message}` }
+    }
+
+    revalidatePath('/admin/coaches')
+    revalidatePath('/student/schedule')
+    return { success: true }
+  } catch (error) {
+    console.error('Update coach schedule error:', error)
+    return { error: 'Er is een onverwachte fout opgetreden' }
+  }
+}
+
 // ==================== NOTE LABELS ====================
 
 export async function createNoteLabel(name: string, color: string, sortOrder: number) {
