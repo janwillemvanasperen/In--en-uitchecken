@@ -316,22 +316,10 @@ export function AttendanceDashboard({
   const [filterCoach, setFilterCoach] = useState('all')
   const [filterClass, setFilterClass] = useState('all')
   const [historyMetric, setHistoryMetric] = useState<HistoryMetric>('inclLeave')
+  const [todayFilterCoach, setTodayFilterCoach] = useState('all')
+  const [todayFilterClass, setTodayFilterClass] = useState('all')
 
   const currentDay = dayOverviews[selectedDayIdx] ?? dayOverviews[0]
-
-  const todayStats = useMemo(() => {
-    const c = { ingepland: 0, aanwezig: 0, uitgecheck: 0, teLaat: 0, afwezig: 0, verlof: 0, verwacht: 0 }
-    c.ingepland = currentDay.students.length
-    for (const s of currentDay.students) {
-      if (s.status === 'aanwezig') c.aanwezig++
-      else if (s.status === 'uitgecheck') c.uitgecheck++
-      else if (s.status === 'te-laat') c.teLaat++
-      else if (s.status === 'afwezig') c.afwezig++
-      else if (s.status === 'verlof') c.verlof++
-      else if (s.status === 'verwacht') c.verwacht++
-    }
-    return c
-  }, [currentDay])
 
   const coaches = useMemo(() => {
     const map: Record<string, string> = {}
@@ -346,6 +334,29 @@ export function AttendanceDashboard({
     for (const s of studentHistories) if (s.class_code) set.add(s.class_code)
     return [...set].sort()
   }, [studentHistories])
+
+  // todayFilterCoach stores coach_name (DayStudent only has coach_name, not coach_id)
+  const filteredDayStudents = useMemo(() => {
+    return currentDay.students.filter(s => {
+      if (todayFilterCoach !== 'all' && s.coach_name !== todayFilterCoach) return false
+      if (todayFilterClass !== 'all' && s.class_code !== todayFilterClass) return false
+      return true
+    })
+  }, [currentDay.students, todayFilterCoach, todayFilterClass])
+
+  const todayStats = useMemo(() => {
+    const c = { ingepland: 0, aanwezig: 0, uitgecheck: 0, teLaat: 0, afwezig: 0, verlof: 0, verwacht: 0 }
+    c.ingepland = filteredDayStudents.length
+    for (const s of filteredDayStudents) {
+      if (s.status === 'aanwezig') c.aanwezig++
+      else if (s.status === 'uitgecheck') c.uitgecheck++
+      else if (s.status === 'te-laat') c.teLaat++
+      else if (s.status === 'afwezig') c.afwezig++
+      else if (s.status === 'verlof') c.verlof++
+      else if (s.status === 'verwacht') c.verwacht++
+    }
+    return c
+  }, [filteredDayStudents])
 
   const filteredStudents = useMemo(() => {
     return studentHistories.filter(s => {
@@ -431,6 +442,38 @@ export function AttendanceDashboard({
             </div>
           )}
 
+          {/* Filters */}
+          {(coaches.length > 0 || classes.length > 0) && (
+            <div className="flex flex-wrap gap-3">
+              {coaches.length > 0 && (
+                <Select value={todayFilterCoach} onValueChange={setTodayFilterCoach}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Alle coaches" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle coaches</SelectItem>
+                    {coaches.map(([, name]) => (
+                      <SelectItem key={name} value={name}>{name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {classes.length > 0 && (
+                <Select value={todayFilterClass} onValueChange={setTodayFilterClass}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Alle klassen" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle klassen</SelectItem>
+                    {classes.map(c => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          )}
+
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <StatCard label="Ingepland" value={todayStats.ingepland} />
@@ -476,14 +519,16 @@ export function AttendanceDashboard({
               <CardTitle className="text-base">
                 {currentDay.dayLabel}
                 <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  ({currentDay.students.length} ingepland)
+                  ({filteredDayStudents.length}{filteredDayStudents.length !== currentDay.students.length ? ` van ${currentDay.students.length}` : ''} ingepland)
                 </span>
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
-              {currentDay.students.length === 0 ? (
+              {filteredDayStudents.length === 0 ? (
                 <p className="px-6 py-8 text-sm text-muted-foreground text-center">
-                  Geen studenten ingepland op deze dag.
+                  {currentDay.students.length === 0
+                    ? 'Geen studenten ingepland op deze dag.'
+                    : 'Geen studenten gevonden met deze filters.'}
                 </p>
               ) : (
                 <table className="w-full text-sm">
@@ -515,7 +560,7 @@ export function AttendanceDashboard({
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {currentDay.students.map(s => (
+                    {filteredDayStudents.map(s => (
                       <tr key={s.id} className="hover:bg-muted/20">
                         <td className="px-4 py-2 font-medium">{s.full_name}</td>
                         <td className="px-4 py-2 text-xs text-muted-foreground hidden sm:table-cell">
