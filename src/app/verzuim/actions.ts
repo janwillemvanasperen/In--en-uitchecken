@@ -5,6 +5,10 @@ import { requireAdminOrVerzuim } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
+function hhmm(t: string): string {
+  return t.substring(0, 5)
+}
+
 export async function updateCheckInTimes(
   checkInId: string,
   dateStr: string,       // "YYYY-MM-DD"
@@ -14,8 +18,8 @@ export async function updateCheckInTimes(
   await requireAdminOrVerzuim()
   const adminClient = createAdminClient()
 
-  const inIso = `${dateStr}T${checkInTime}:00`
-  const outIso = checkOutTime ? `${dateStr}T${checkOutTime}:00` : null
+  const inIso = `${dateStr}T${hhmm(checkInTime)}:00`
+  const outIso = checkOutTime ? `${dateStr}T${hhmm(checkOutTime)}:00` : null
 
   if (outIso && outIso <= inIso) {
     return { error: 'Uittijd moet na inchecktijd liggen.' }
@@ -42,8 +46,8 @@ export async function createManualCheckIn(
   await requireAdminOrVerzuim()
   const adminClient = createAdminClient()
 
-  const inIso = `${dateStr}T${checkInTime}:00`
-  const outIso = checkOutTime ? `${dateStr}T${checkOutTime}:00` : null
+  const inIso = `${dateStr}T${hhmm(checkInTime)}:00`
+  const outIso = checkOutTime ? `${dateStr}T${hhmm(checkOutTime)}:00` : null
 
   if (outIso && outIso <= inIso) {
     return { error: 'Uittijd moet na inchecktijd liggen.' }
@@ -60,8 +64,8 @@ export async function createManualCheckIn(
     location_id: locations[0].id,
     check_in_time: inIso,
     check_out_time: outIso,
-    expected_start: `${dateStr}T${expectedStart}:00`,
-    expected_end: `${dateStr}T${expectedEnd}:00`,
+    expected_start: `${dateStr}T${expectedStart.substring(0, 5)}:00`,
+    expected_end: `${dateStr}T${expectedEnd.substring(0, 5)}:00`,
   })
 
   if (error) return { error: error.message }
