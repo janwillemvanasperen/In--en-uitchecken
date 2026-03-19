@@ -16,6 +16,7 @@ const ALL_ROLES = [
   { value: 'student', label: 'Student' },
   { value: 'admin', label: 'Beheerder' },
   { value: 'coach', label: 'Coach' },
+  { value: 'verzuim', label: 'Verzuimbeheerder' },
 ]
 
 export function UserForm({
@@ -30,7 +31,7 @@ export function UserForm({
   const [fullName, setFullName] = useState(user?.full_name || '')
   const [email, setEmail] = useState(user?.email || '')
   const [password, setPassword] = useState('')
-  const [role, setRole] = useState<'student' | 'admin' | 'coach'>(user?.role || 'student')
+  const [role, setRole] = useState<'student' | 'admin' | 'coach' | 'verzuim'>(user?.role || 'student')
   const [roles, setRoles] = useState<string[]>(user?.roles?.length ? user.roles : [user?.role || 'student'])
   const [coachId, setCoachId] = useState<string>(user?.coach_id || '__none__')
   const [classCode, setClassCode] = useState<string>((user as any)?.class_code || '')

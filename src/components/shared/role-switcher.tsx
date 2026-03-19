@@ -16,6 +16,7 @@ const ROLE_LABELS: Record<string, string> = {
   student: 'Student',
   admin: 'Beheerder',
   coach: 'Coach',
+  verzuim: 'Verzuim',
 }
 
 interface RoleSwitcherProps {

@@ -23,7 +23,7 @@ export type Notification = Database['public']['Tables']['notifications']['Row']
 export type NotificationType = 'check_in' | 'check_out' | 'leave_approved' | 'leave_rejected' | 'schedule_approved' | 'schedule_rejected' | 'system'
 
 // Enum types
-export type UserRole = 'student' | 'admin' | 'coach'
+export type UserRole = 'student' | 'admin' | 'coach' | 'verzuim' | 'verzuim'
 export type ScheduleStatus = 'pending' | 'approved' | 'rejected'
 export type LeaveReason = 'sick' | 'late' | 'appointment'
 export type LeaveStatus = 'pending' | 'approved' | 'rejected'
@@ -80,7 +80,7 @@ export type CreateUserInput = {
   email: string
   password: string
   full_name: string
-  role: 'student' | 'admin' | 'coach'
+  role: 'student' | 'admin' | 'coach' | 'verzuim'
   roles?: string[]
   coach_id?: string | null
 }
@@ -88,7 +88,7 @@ export type CreateUserInput = {
 export type UpdateUserInput = {
   full_name?: string
   email?: string
-  role?: 'student' | 'admin' | 'coach'
+  role?: 'student' | 'admin' | 'coach' | 'verzuim'
   roles?: string[]
   coach_id?: string | null
   class_code?: string | null

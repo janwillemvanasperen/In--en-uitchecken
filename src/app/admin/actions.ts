@@ -2,7 +2,7 @@
 'use server'
 
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/lib/auth'
+import { requireAdmin, requireAdminOrVerzuim } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import type { CreateUserInput, UpdateUserInput, CreateLocationInput, UpdateLocationInput } from '@/types'
 
@@ -199,7 +199,7 @@ export async function deleteLocation(id: string) {
 
 export async function approveSchedule(submissionGroup: string, adminNote?: string) {
   try {
-    await requireAdmin()
+    await requireAdminOrVerzuim()
     const supabase = await createClient()
 
     const updateData: Record<string, any> = { status: 'approved' }
@@ -225,7 +225,7 @@ export async function approveSchedule(submissionGroup: string, adminNote?: strin
 
 export async function rejectSchedule(submissionGroup: string, adminNote?: string) {
   try {
-    await requireAdmin()
+    await requireAdminOrVerzuim()
     const supabase = await createClient()
     const adminClient = createAdminClient()
 
@@ -315,7 +315,7 @@ export async function createSchedulePush(
   message?: string
 ) {
   try {
-    const admin = await requireAdmin()
+    const admin = await requireAdminOrVerzuim()
     const adminClient = createAdminClient()
 
     // Create the push request
@@ -396,7 +396,7 @@ export async function updateDayCapacities(capacities: Array<{ day_of_week: numbe
 
 export async function autoApplyExistingSchedules(pushRequestId: string) {
   try {
-    await requireAdmin()
+    await requireAdminOrVerzuim()
     const adminClient = createAdminClient()
 
     // Get the push request dates
@@ -468,7 +468,7 @@ export async function autoApplyExistingSchedules(pushRequestId: string) {
 
 export async function approveLeaveRequest(id: string, adminNote?: string) {
   try {
-    const admin = await requireAdmin()
+    const admin = await requireAdminOrVerzuim()
     const supabase = await createClient()
 
     const updateData: Record<string, any> = {
@@ -498,7 +498,7 @@ export async function approveLeaveRequest(id: string, adminNote?: string) {
 
 export async function rejectLeaveRequest(id: string, adminNote?: string) {
   try {
-    const admin = await requireAdmin()
+    const admin = await requireAdminOrVerzuim()
     const supabase = await createClient()
 
     const updateData: Record<string, any> = {

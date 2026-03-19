@@ -44,6 +44,7 @@ export async function requireStudent(): Promise<UserProfile> {
   if (user.role !== 'student') {
     if (user.role === 'admin') redirect('/admin/dashboard')
     if (user.role === 'coach') redirect('/coach/dashboard')
+    if (user.role === 'verzuim') redirect('/verzuim/dashboard')
     redirect('/auth/login')
   }
   return user
@@ -53,6 +54,26 @@ export async function requireCoach(): Promise<UserProfile> {
   const user = await requireAuth()
   if (user.role !== 'coach') {
     if (user.role === 'admin') redirect('/admin/dashboard')
+    if (user.role === 'verzuim') redirect('/verzuim/dashboard')
+    redirect('/student/dashboard')
+  }
+  return user
+}
+
+export async function requireVerzuim(): Promise<UserProfile> {
+  const user = await requireAuth()
+  if (user.role !== 'verzuim') {
+    if (user.role === 'admin') redirect('/admin/dashboard')
+    if (user.role === 'coach') redirect('/coach/dashboard')
+    redirect('/student/dashboard')
+  }
+  return user
+}
+
+export async function requireAdminOrVerzuim(): Promise<UserProfile> {
+  const user = await requireAuth()
+  if (user.role !== 'admin' && user.role !== 'verzuim') {
+    if (user.role === 'coach') redirect('/coach/dashboard')
     redirect('/student/dashboard')
   }
   return user

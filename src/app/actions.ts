@@ -25,7 +25,7 @@ export async function switchRole(newRole: string) {
   // Update the active role via admin client to bypass RLS
   const { error } = await adminClient
     .from('users')
-    .update({ role: newRole as 'student' | 'admin' | 'coach' })
+    .update({ role: newRole as 'student' | 'admin' | 'coach' | 'verzuim' })
     .eq('id', user.id)
 
   if (error) {
@@ -42,6 +42,8 @@ export async function switchRole(newRole: string) {
     admin: '/admin/dashboard',
     coach: '/coach/dashboard',
     student: '/student/dashboard',
+    verzuim: '/verzuim/dashboard',
   }
+  revalidatePath('/verzuim/dashboard', 'layout')
   return { redirectTo: dashboardMap[newRole] ?? '/student/dashboard' }
 }

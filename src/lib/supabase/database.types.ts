@@ -13,7 +13,7 @@ export type Database = {
         Row: {
           id: string
           email: string
-          role: 'student' | 'admin' | 'coach'
+          role: 'student' | 'admin' | 'coach' | 'verzuim'
           roles: string[]
           full_name: string
           coach_id: string | null
@@ -27,7 +27,7 @@ export type Database = {
         Insert: {
           id: string
           email: string
-          role?: 'student' | 'admin' | 'coach'
+          role?: 'student' | 'admin' | 'coach' | 'verzuim'
           roles?: string[]
           full_name: string
           coach_id?: string | null
@@ -41,7 +41,7 @@ export type Database = {
         Update: {
           id?: string
           email?: string
-          role?: 'student' | 'admin' | 'coach'
+          role?: 'student' | 'admin' | 'coach' | 'verzuim'
           roles?: string[]
           full_name?: string
           coach_id?: string | null
@@ -647,7 +647,7 @@ export type Database = {
       }
     }
     Enums: {
-      user_role: 'student' | 'admin' | 'coach'
+      user_role: 'student' | 'admin' | 'coach' | 'verzuim'
       schedule_status: 'pending' | 'approved' | 'rejected'
       leave_reason: 'sick' | 'late' | 'appointment'
       leave_status: 'pending' | 'approved' | 'rejected'

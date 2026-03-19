@@ -1,11 +1,12 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-type UserRole = 'student' | 'admin' | 'coach'
+type UserRole = 'student' | 'admin' | 'coach' | 'verzuim'
 
 function dashboardForRole(role: UserRole | null | undefined): string {
   if (role === 'admin') return '/admin/dashboard'
   if (role === 'coach') return '/coach/dashboard'
+  if (role === 'verzuim') return '/verzuim/dashboard'
   return '/student/dashboard'
 }
 
@@ -108,6 +109,22 @@ export async function middleware(request: NextRequest) {
 
     const userRole = (userData as { role: UserRole } | null)?.role
     if (userRole !== 'coach') {
+      const url = request.nextUrl.clone()
+      url.pathname = dashboardForRole(userRole)
+      return NextResponse.redirect(url)
+    }
+  }
+
+  // Role-based access control for /verzuim/*
+  if (user && path.startsWith('/verzuim')) {
+    const { data: userData } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    const userRole = (userData as { role: UserRole } | null)?.role
+    if (userRole !== 'verzuim') {
       const url = request.nextUrl.clone()
       url.pathname = dashboardForRole(userRole)
       return NextResponse.redirect(url)
