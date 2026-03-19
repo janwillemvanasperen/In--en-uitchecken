@@ -11,11 +11,12 @@ import { Card, CardContent } from '@/components/ui/card'
 
 export const dynamic = 'force-dynamic'
 
-export default async function CoachDashboard({ searchParams }: { searchParams: any }) {
+export default async function CoachDashboard({ searchParams }: { searchParams: Promise<any> }) {
+  const sp = await searchParams
   const user = await requireCoach()
   const supabase = await createClient()
   const adminClient = createAdminClient()
-  const view = getCoachView(searchParams)
+  const view = getCoachView(sp)
 
   const today = new Date()
   const dayOfWeek = today.getDay() || 7

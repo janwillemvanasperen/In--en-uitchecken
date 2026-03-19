@@ -1,14 +1,16 @@
 // @ts-nocheck
 import { requireStudent } from '@/lib/auth'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScheduleEditor } from '@/components/student/schedule-editor'
 import { ScheduleOverview } from '@/components/student/schedule-overview'
 import { ScheduleHistory } from '@/components/student/schedule-history'
 
-export default async function SchedulePage() {
+export default async function SchedulePage({ searchParams }: { searchParams: Promise<any> }) {
+  const sp = await searchParams
   const user = await requireStudent()
   const supabase = await createClient()
+  const adminClient = createAdminClient()
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -45,6 +47,20 @@ export default async function SchedulePage() {
   const defaultStartTime = settingsMap['default_start_time'] || '10:00'
   const periodWeeks = Number(settingsMap['schedule_approval_period_weeks'] || '6')
 
+  // Open schedule push request for this student
+  const { data: openPushRecipient } = await adminClient
+    .from('schedule_push_recipients')
+    .select('id, schedule_push_requests(id, valid_from, valid_until, message)')
+    .eq('student_id', user.id)
+    .eq('responded', false)
+    .order('id', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const openPush = openPushRecipient
+    ? (openPushRecipient.schedule_push_requests as any)
+    : null
+
   // Get schedule history (past schedules, grouped by submission_group)
   const { data: allSchedules } = await supabase
     .from('schedules')
@@ -71,10 +87,11 @@ export default async function SchedulePage() {
 
   const history = Object.values(historyGroups).slice(0, 10)
 
-  // Determine default tab
+  // Determine default tab — open push or ?tab=indienen forces submit tab
   const hasPending = pendingSchedule && pendingSchedule.length > 0
   const hasApproved = currentSchedule && currentSchedule.length > 0
-  const defaultTab = (!hasApproved && !hasPending) ? 'indienen' : 'overzicht'
+  const forceSubmit = sp?.tab === 'indienen' || !!openPush
+  const defaultTab = (forceSubmit || (!hasApproved && !hasPending)) ? 'indienen' : 'overzicht'
 
   return (
     <Tabs defaultValue={defaultTab} className="space-y-6">
@@ -99,6 +116,12 @@ export default async function SchedulePage() {
           minimumHours={minimumHours}
           periodWeeks={periodWeeks}
           existingPending={pendingSchedule}
+          pushRequest={openPush ? {
+            id: openPush.id,
+            valid_from: openPush.valid_from,
+            valid_until: openPush.valid_until,
+            message: openPush.message,
+          } : null}
         />
       </TabsContent>
     </Tabs>

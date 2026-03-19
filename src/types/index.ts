@@ -56,6 +56,9 @@ export type ScheduleEntry = {
 
 export type ScheduleSubmissionInput = {
   entries: ScheduleEntry[]
+  pushRequestId?: string
+  forcedValidFrom?: string
+  forcedValidUntil?: string
 }
 
 export type PushSubscriptionInput = {

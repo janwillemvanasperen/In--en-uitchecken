@@ -23,11 +23,19 @@ const DAY_NAMES: Record<number, string> = {
   7: 'Zondag',
 }
 
+interface PushRequest {
+  id: string
+  valid_from: string
+  valid_until: string
+  message: string | null
+}
+
 interface ScheduleEditorProps {
   defaultStartTime: string
   minimumHours: number
   periodWeeks: number
   existingPending: Schedule[] | null
+  pushRequest?: PushRequest | null
 }
 
 function buildInitialEntries(
@@ -59,6 +67,7 @@ export function ScheduleEditor({
   minimumHours,
   periodWeeks,
   existingPending,
+  pushRequest,
 }: ScheduleEditorProps) {
   const router = useRouter()
   const isEditing = !!existingPending && existingPending.length > 0
@@ -89,14 +98,13 @@ export function ScheduleEditor({
   const progressPercent = Math.min(100, (totalHours / minimumHours) * 100)
   const isValid = totalHours >= minimumHours
 
-  const validFrom = new Date().toLocaleDateString('nl-NL', {
-    day: 'numeric', month: 'long', year: 'numeric'
-  })
-  const validUntilDate = new Date()
-  validUntilDate.setDate(validUntilDate.getDate() + periodWeeks * 7)
-  const validUntil = validUntilDate.toLocaleDateString('nl-NL', {
-    day: 'numeric', month: 'long', year: 'numeric'
-  })
+  // Period display — use push request dates if available, else auto-calculate
+  const validFrom = pushRequest
+    ? new Date(pushRequest.valid_from).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
+    : new Date().toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
+  const validUntil = pushRequest
+    ? new Date(pushRequest.valid_until).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
+    : (() => { const d = new Date(); d.setDate(d.getDate() + periodWeeks * 7); return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' }) })()
 
   const handleSubmit = async () => {
     setIsSubmitting(true)
@@ -104,7 +112,12 @@ export function ScheduleEditor({
     setSuccess(null)
 
     const action = isEditing ? updatePendingSchedule : submitSchedule
-    const result = await action({ entries })
+    const result = await action({
+      entries,
+      pushRequestId: pushRequest?.id,
+      forcedValidFrom: pushRequest?.valid_from,
+      forcedValidUntil: pushRequest?.valid_until,
+    })
 
     if (result.error) {
       setError(result.error)
@@ -152,9 +165,17 @@ export function ScheduleEditor({
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Period info */}
-        <div className="rounded-lg bg-muted p-3 text-sm">
-          <p className="font-medium">Geldigheidsperiode</p>
-          <p className="text-muted-foreground">{validFrom} — {validUntil} ({periodWeeks} weken)</p>
+        <div className={`rounded-lg p-3 text-sm ${pushRequest ? 'bg-[#ffd100]/10 border border-[#ffd100]/40' : 'bg-muted'}`}>
+          <p className="font-medium">
+            {pushRequest ? 'Gevraagde roosterperiode' : 'Geldigheidsperiode'}
+          </p>
+          <p className="text-muted-foreground">
+            {validFrom} — {validUntil}
+            {!pushRequest && ` (${periodWeeks} weken)`}
+          </p>
+          {pushRequest?.message && (
+            <p className="mt-1 text-muted-foreground italic">&quot;{pushRequest.message}&quot;</p>
+          )}
         </div>
 
         {/* Day entries */}

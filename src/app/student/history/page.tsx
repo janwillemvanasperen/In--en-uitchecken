@@ -11,12 +11,13 @@ function toDateStr(d: Date): string {
 export default async function HistoryPage({
   searchParams,
 }: {
-  searchParams: { week?: string }
+  searchParams: Promise<{ week?: string }>
 }) {
+  const { week } = await searchParams
   const user = await requireStudent()
   const supabase = await createClient()
 
-  const raw = parseInt(searchParams?.week ?? '0')
+  const raw = parseInt(week ?? '0')
   const weekOffset = Math.min(0, isNaN(raw) ? 0 : raw)
 
   // Determine the Monday of the target week

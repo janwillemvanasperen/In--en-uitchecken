@@ -12,10 +12,11 @@ import { Star } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
-export default async function CoachComparePage({ searchParams }: { searchParams: any }) {
+export default async function CoachComparePage({ searchParams }: { searchParams: Promise<any> }) {
+  const sp = await searchParams
   const user = await requireCoach()
   const supabase = await createClient()
-  const view = getCoachView(searchParams)
+  const view = getCoachView(sp)
 
   const monday = getMonday(new Date())
   const mondayStr = toLocalDateStr(monday)

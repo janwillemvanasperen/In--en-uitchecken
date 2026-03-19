@@ -26,11 +26,16 @@ export async function createNote(
     .eq('id', coach.id)
     .single()
 
+  // Verify coach has access to this student (student must be assigned to this coach)
   const { data: student } = await adminClient
     .from('users')
-    .select('full_name')
+    .select('full_name, coach_id')
     .eq('id', studentId)
+    .eq('role', 'student')
     .single()
+
+  if (!student) return { error: 'Student niet gevonden' }
+  if (student.coach_id !== coach.id) return { error: 'Geen toegang tot deze student' }
 
   const { error } = await supabase.from('coach_notes').insert({
     coach_id: coach.id,

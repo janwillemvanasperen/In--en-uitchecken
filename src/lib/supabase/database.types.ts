@@ -262,6 +262,8 @@ export type Database = {
           valid_from: string
           valid_until: string
           submission_group: string | null
+          admin_note: string | null
+          push_request_id: string | null
           created_at: string
           updated_at: string
         }
@@ -275,6 +277,8 @@ export type Database = {
           valid_from: string
           valid_until: string
           submission_group?: string | null
+          admin_note?: string | null
+          push_request_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -288,8 +292,59 @@ export type Database = {
           valid_from?: string
           valid_until?: string
           submission_group?: string | null
+          admin_note?: string | null
+          push_request_id?: string | null
           created_at?: string
           updated_at?: string
+        }
+      }
+      schedule_push_requests: {
+        Row: {
+          id: string
+          valid_from: string
+          valid_until: string
+          message: string | null
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          valid_from: string
+          valid_until: string
+          message?: string | null
+          created_by: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          valid_from?: string
+          valid_until?: string
+          message?: string | null
+          created_by?: string
+          created_at?: string
+        }
+      }
+      schedule_push_recipients: {
+        Row: {
+          id: string
+          push_request_id: string
+          student_id: string
+          responded: boolean
+          responded_at: string | null
+        }
+        Insert: {
+          id?: string
+          push_request_id: string
+          student_id: string
+          responded?: boolean
+          responded_at?: string | null
+        }
+        Update: {
+          id?: string
+          push_request_id?: string
+          student_id?: string
+          responded?: boolean
+          responded_at?: string | null
         }
       }
       development_goal_names: {

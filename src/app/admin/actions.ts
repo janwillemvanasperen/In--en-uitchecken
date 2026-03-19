@@ -227,9 +227,17 @@ export async function rejectSchedule(submissionGroup: string, adminNote?: string
   try {
     await requireAdmin()
     const supabase = await createClient()
+    const adminClient = createAdminClient()
 
     const updateData: Record<string, any> = { status: 'rejected' }
     if (adminNote?.trim()) updateData.admin_note = adminNote.trim()
+
+    // Get the affected schedules (to find student_id and push_request_id)
+    const { data: schedules } = await supabase
+      .from('schedules')
+      .select('user_id, push_request_id')
+      .eq('submission_group', submissionGroup)
+      .limit(1)
 
     const { error } = await supabase
       .from('schedules')
@@ -240,11 +248,104 @@ export async function rejectSchedule(submissionGroup: string, adminNote?: string
       return { error: `Rooster afwijzen mislukt: ${error.message}` }
     }
 
+    // Send in-app notification to student with rejection reason
+    if (schedules && schedules.length > 0) {
+      const { user_id, push_request_id } = schedules[0]
+      const reason = adminNote?.trim()
+
+      await adminClient.from('notifications').insert({
+        user_id,
+        type: 'schedule_rejected',
+        title: 'Rooster afgekeurd',
+        message: reason
+          ? `Je ingediende rooster is afgekeurd. Reden: ${reason}`
+          : 'Je ingediende rooster is afgekeurd. Dien een nieuw rooster in.',
+        related_id: submissionGroup,
+        read: false,
+      })
+
+      // Re-open the push request so the student sees the banner again
+      if (push_request_id) {
+        await adminClient
+          .from('schedule_push_recipients')
+          .update({ responded: false, responded_at: null })
+          .eq('push_request_id', push_request_id)
+          .eq('student_id', user_id)
+      }
+    }
+
     revalidatePath('/admin/schedules')
     revalidatePath('/admin/dashboard')
     return { success: true }
   } catch (error) {
     console.error('Reject schedule error:', error)
+    return { error: 'Er is een onverwachte fout opgetreden' }
+  }
+}
+
+// ==================== SCHEDULE PUSH ====================
+
+export async function createSchedulePush(
+  validFrom: string,
+  validUntil: string,
+  studentIds: string[],
+  message?: string
+) {
+  try {
+    const admin = await requireAdmin()
+    const adminClient = createAdminClient()
+
+    // Create the push request
+    const { data: pushRequest, error: pushError } = await adminClient
+      .from('schedule_push_requests')
+      .insert({
+        valid_from: validFrom,
+        valid_until: validUntil,
+        message: message?.trim() || null,
+        created_by: admin.id,
+      })
+      .select('id')
+      .single()
+
+    if (pushError || !pushRequest) {
+      return { error: `Push aanmaken mislukt: ${pushError?.message}` }
+    }
+
+    // Create recipient rows
+    const recipients = studentIds.map((student_id) => ({
+      push_request_id: pushRequest.id,
+      student_id,
+      responded: false,
+    }))
+
+    const { error: recipError } = await adminClient
+      .from('schedule_push_recipients')
+      .insert(recipients)
+
+    if (recipError) {
+      return { error: `Ontvangers opslaan mislukt: ${recipError.message}` }
+    }
+
+    // Send in-app notifications
+    const periodLabel = `${new Date(validFrom).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })} t/m ${new Date(validUntil).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}`
+    const notifications = studentIds.map((student_id) => ({
+      user_id: student_id,
+      type: 'system',
+      title: 'Vul je rooster in',
+      message: message?.trim()
+        ? `${message.trim()} — periode: ${periodLabel}`
+        : `Je kunt nu je rooster indienen voor de periode ${periodLabel}.`,
+      related_id: pushRequest.id,
+      read: false,
+    }))
+
+    await adminClient.from('notifications').insert(notifications)
+
+    revalidatePath('/admin/schedule-push')
+    revalidatePath('/admin/dashboard')
+    return { success: true }
+  } catch (error) {
+    console.error('Schedule push error:', error)
     return { error: 'Er is een onverwachte fout opgetreden' }
   }
 }

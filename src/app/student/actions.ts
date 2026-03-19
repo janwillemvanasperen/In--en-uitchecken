@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { requireStudent } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { isWithinRadius } from '@/lib/geolocation'
@@ -241,21 +241,27 @@ export async function submitSchedule(data: ScheduleSubmissionInput) {
       return { error: 'Je hebt al een rooster in afwachting. Bewerk of verwijder dat eerst.' }
     }
 
-    // Fetch period weeks setting
-    const { data: periodSetting } = await supabase
-      .from('settings')
-      .select('value')
-      .eq('key', 'schedule_approval_period_weeks')
-      .single()
+    // Calculate validity period — use push request dates if provided
+    let validFrom: string
+    let validUntil: string
 
-    const periodWeeks = periodSetting ? Number(periodSetting.value) : 6
+    if (data.forcedValidFrom && data.forcedValidUntil) {
+      validFrom = data.forcedValidFrom
+      validUntil = data.forcedValidUntil
+    } else {
+      const { data: periodSetting } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'schedule_approval_period_weeks')
+        .single()
 
-    // Calculate validity period
-    const today = new Date()
-    const validFrom = today.toISOString().split('T')[0]
-    const validUntilDate = new Date(today)
-    validUntilDate.setDate(validUntilDate.getDate() + periodWeeks * 7)
-    const validUntil = validUntilDate.toISOString().split('T')[0]
+      const periodWeeks = periodSetting ? Number(periodSetting.value) : 6
+      const today = new Date()
+      validFrom = today.toISOString().split('T')[0]
+      const validUntilDate = new Date(today)
+      validUntilDate.setDate(validUntilDate.getDate() + periodWeeks * 7)
+      validUntil = validUntilDate.toISOString().split('T')[0]
+    }
 
     // Generate submission group
     const submissionGroup = crypto.randomUUID()
@@ -270,6 +276,7 @@ export async function submitSchedule(data: ScheduleSubmissionInput) {
       valid_from: validFrom,
       valid_until: validUntil,
       submission_group: submissionGroup,
+      push_request_id: data.pushRequestId || null,
     }))
 
     // @ts-ignore - Supabase SSR type inference issue
@@ -280,6 +287,16 @@ export async function submitSchedule(data: ScheduleSubmissionInput) {
     if (insertError) {
       console.error('Schedule submit error:', insertError)
       return { error: 'Rooster indienen mislukt. Probeer het opnieuw.' }
+    }
+
+    // Mark push recipient as responded
+    if (data.pushRequestId) {
+      const adminClient = createAdminClient()
+      await adminClient
+        .from('schedule_push_recipients')
+        .update({ responded: true, responded_at: new Date().toISOString() })
+        .eq('push_request_id', data.pushRequestId)
+        .eq('student_id', user.id)
     }
 
     revalidatePath('/student/schedule')
@@ -343,8 +360,12 @@ export async function updatePendingSchedule(data: ScheduleSubmissionInput) {
     }
 
     const submissionGroup = (existingPending[0] as any).submission_group || crypto.randomUUID()
-    const validFrom = (existingPending[0] as any).valid_from
-    const validUntil = (existingPending[0] as any).valid_until
+    const existingPushRequestId = (existingPending[0] as any).push_request_id || null
+
+    // Use forced dates (from push request) or preserve existing dates
+    const validFrom = data.forcedValidFrom || (existingPending[0] as any).valid_from
+    const validUntil = data.forcedValidUntil || (existingPending[0] as any).valid_until
+    const pushRequestId = data.pushRequestId || existingPushRequestId
 
     // Delete existing pending entries
     // @ts-ignore
@@ -369,6 +390,7 @@ export async function updatePendingSchedule(data: ScheduleSubmissionInput) {
       valid_from: validFrom,
       valid_until: validUntil,
       submission_group: submissionGroup,
+      push_request_id: pushRequestId,
     }))
 
     // @ts-ignore
@@ -379,6 +401,16 @@ export async function updatePendingSchedule(data: ScheduleSubmissionInput) {
     if (insertError) {
       console.error('Schedule update error:', insertError)
       return { error: 'Rooster bijwerken mislukt. Probeer het opnieuw.' }
+    }
+
+    // Mark push recipient as responded
+    if (pushRequestId) {
+      const adminClient = createAdminClient()
+      await adminClient
+        .from('schedule_push_recipients')
+        .update({ responded: true, responded_at: new Date().toISOString() })
+        .eq('push_request_id', pushRequestId)
+        .eq('student_id', user.id)
     }
 
     revalidatePath('/student/schedule')

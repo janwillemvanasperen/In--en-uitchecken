@@ -5,8 +5,9 @@ import { CheckInClient } from '@/components/student/check-in-client'
 export default async function CheckInPage({
   searchParams,
 }: {
-  searchParams: { mode?: string }
+  searchParams: Promise<{ mode?: string }>
 }) {
+  const { mode } = await searchParams
   const user = await requireStudent()
   const supabase = await createClient()
 
@@ -44,7 +45,7 @@ export default async function CheckInPage({
       activeCheckIn={activeCheckIn}
       todaySchedule={todaySchedule}
       userId={user.id}
-      initialMode={searchParams.mode === 'qr' ? 'qr' : 'gps'}
+      initialMode={mode === 'qr' ? 'qr' : 'gps'}
     />
   )
 }

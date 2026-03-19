@@ -8,6 +8,9 @@ import { DevelopmentGoalsCard } from '@/components/student/development-goals-car
 import { getMonday, toLocalDateStr } from '@/lib/date-utils'
 import type { DayData } from '@/components/student/week-history-view'
 import { createAdminClient } from '@/lib/supabase/server'
+import { CalendarClock } from 'lucide-react'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
 
 export default async function StudentDashboard() {
   const user = await requireStudent()
@@ -159,6 +162,31 @@ export default async function StudentDashboard() {
     s.day_of_week === dayOfWeek && s.valid_from <= todayStr && s.valid_until >= todayStr
   ) ?? null
 
+  // Open schedule push request for this student
+  const { data: openPushRecipient } = await adminClient
+    .from('schedule_push_recipients')
+    .select('id, responded, schedule_push_requests(id, valid_from, valid_until, message)')
+    .eq('student_id', user.id)
+    .eq('responded', false)
+    .order('id', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const openPush = openPushRecipient
+    ? (openPushRecipient.schedule_push_requests as any)
+    : null
+
+  // Check if student has a rejected schedule from this push (to show different message)
+  const hasRejectedForPush = openPush
+    ? !!(await adminClient
+        .from('schedules')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('status', 'rejected')
+        .eq('push_request_id', openPush.id)
+        .then(r => r.count && r.count > 0))
+    : false
+
   // Coach notes visible to student
   const { data: coachNotes } = await supabase
     .from('coach_notes')
@@ -170,6 +198,34 @@ export default async function StudentDashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Schedule push banner */}
+      {openPush && (
+        <div className={`rounded-xl border p-4 flex items-start gap-3 ${
+          hasRejectedForPush
+            ? 'border-red-300 bg-red-50'
+            : 'border-[#ffd100] bg-[#ffd100]/10'
+        }`}>
+          <CalendarClock className={`h-5 w-5 mt-0.5 shrink-0 ${hasRejectedForPush ? 'text-red-600' : 'text-[#b89900]'}`} />
+          <div className="flex-1 min-w-0">
+            <p className={`text-sm font-semibold ${hasRejectedForPush ? 'text-red-800' : 'text-[#b89900]'}`}>
+              {hasRejectedForPush ? 'Je rooster is afgekeurd — vul het opnieuw in' : 'Vul je rooster in'}
+            </p>
+            <p className="text-sm mt-0.5 text-muted-foreground">
+              Periode:{' '}
+              {new Date(openPush.valid_from).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })}
+              {' '}t/m{' '}
+              {new Date(openPush.valid_until).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}
+              {openPush.message && ` — ${openPush.message}`}
+            </p>
+          </div>
+          <Link href="/student/schedule?tab=indienen">
+            <Button size="sm" className="shrink-0 bg-[#ffd100] text-black hover:bg-[#e6bc00]">
+              Rooster invullen
+            </Button>
+          </Link>
+        </div>
+      )}
+
       {/* Coach notes banner */}
       {(coachNotes || []).length > 0 && (
         <div className="rounded-xl border border-[#ffd100]/40 bg-[#ffd100]/10 p-4">

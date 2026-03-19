@@ -22,18 +22,20 @@ export default async function CoachStudentDetailPage({
   params,
   searchParams,
 }: {
-  params: { id: string }
-  searchParams: any
+  params: Promise<{ id: string }>
+  searchParams: Promise<any>
 }) {
   const coach = await requireCoach()
   const supabase = await createClient()
   const adminClient = createAdminClient()
-  const view = getCoachView(searchParams)
-  const activeTab = searchParams?.tab || 'overzicht'
+  const { id: studentId } = await params
+  const sp = await searchParams
+  const view = getCoachView(sp)
+  const activeTab = sp?.tab || 'overzicht'
 
   // Fetch student + coach entity
   const [{ data: student }, coachEntityId] = await Promise.all([
-    adminClient.from('users').select('*').eq('id', params.id).eq('role', 'student').single(),
+    adminClient.from('users').select('*').eq('id', studentId).eq('role', 'student').single(),
     getCoachEntityId(coach.id),
   ])
 
@@ -59,12 +61,12 @@ export default async function CoachStudentDetailPage({
     { data: noteLabels },
     { data: otherCoaches },
   ] = await Promise.all([
-    adminClient.from('schedules').select('*').eq('user_id', params.id).order('valid_from', { ascending: false }),
-    adminClient.from('check_ins').select('*, locations!check_ins_location_id_fkey(name)').eq('user_id', params.id).order('check_in_time', { ascending: false }).limit(50),
-    adminClient.from('leave_requests').select('*').eq('user_id', params.id).order('date', { ascending: false }),
-    adminClient.from('coach_notes').select('*').eq('coach_id', coach.id).eq('student_id', params.id).order('created_at', { ascending: false }),
-    adminClient.from('coach_notes').select('*, users!coach_notes_coach_id_fkey(full_name)').neq('coach_id', coach.id).eq('student_id', params.id).eq('visible_to_coaches', true).order('created_at', { ascending: false }),
-    adminClient.from('check_ins').select('*').eq('user_id', params.id).gte('check_in_time', mondayStr + 'T00:00:00').not('check_out_time', 'is', null),
+    adminClient.from('schedules').select('*').eq('user_id', studentId).order('valid_from', { ascending: false }),
+    adminClient.from('check_ins').select('*, locations!check_ins_location_id_fkey(name)').eq('user_id', studentId).order('check_in_time', { ascending: false }).limit(50),
+    adminClient.from('leave_requests').select('*').eq('user_id', studentId).order('date', { ascending: false }),
+    adminClient.from('coach_notes').select('*').eq('coach_id', coach.id).eq('student_id', studentId).order('created_at', { ascending: false }),
+    adminClient.from('coach_notes').select('*, users!coach_notes_coach_id_fkey(full_name)').neq('coach_id', coach.id).eq('student_id', studentId).eq('visible_to_coaches', true).order('created_at', { ascending: false }),
+    adminClient.from('check_ins').select('*').eq('user_id', studentId).gte('check_in_time', mondayStr + 'T00:00:00').not('check_out_time', 'is', null),
     adminClient.from('note_labels').select('id, name, color').eq('active', true).order('sort_order'),
     adminClient.from('users').select('id, full_name').contains('roles', ['coach']).neq('id', coach.id).order('full_name'),
   ])
@@ -78,7 +80,7 @@ export default async function CoachStudentDetailPage({
   const { data: activeCheckIn } = await adminClient
     .from('check_ins')
     .select('*, locations!check_ins_location_id_fkey(name)')
-    .eq('user_id', params.id)
+    .eq('user_id', studentId)
     .is('check_out_time', null)
     .single()
 
@@ -174,7 +176,7 @@ export default async function CoachStudentDetailPage({
           {tabs.map((tab) => (
             <Link
               key={tab.id}
-              href={`/coach/students/${params.id}?tab=${tab.id}&view=${view}`}
+              href={`/coach/students/${studentId}?tab=${tab.id}&view=${view}`}
               className={`px-3 py-2 text-sm rounded-t-md whitespace-nowrap border-b-2 -mb-px transition-colors ${
                 activeTab === tab.id
                   ? 'border-[#ffd100] font-medium text-foreground'
@@ -443,7 +445,7 @@ export default async function CoachStudentDetailPage({
 
       {activeTab === 'notities' && (
         <NoteEditor
-          studentId={params.id}
+          studentId={studentId}
           currentCoachId={coach.id}
           myNotes={myNotes || []}
           colleagueNotes={(colleagueNotes || []).map((n: any) => ({ ...n, coach: n.users }))}
