@@ -6,6 +6,7 @@ import type { CalendarEvent } from './types'
 
 interface CalendarGridProps {
   events: CalendarEvent[]
+  meetingSlotDates?: string[]
   month: number   // 0-indexed (0 = January)
   year: number
   onDayClick: (dateStr: string) => void
@@ -33,7 +34,7 @@ function mondayDow(jsDay: number): number {
   return (jsDay + 6) % 7
 }
 
-export function CalendarGrid({ events, month, year, onDayClick, onMonthChange }: CalendarGridProps) {
+export function CalendarGrid({ events, meetingSlotDates, month, year, onDayClick, onMonthChange }: CalendarGridProps) {
   const today = todayYMD()
 
   // Build a map: dateStr → events[]
@@ -43,6 +44,8 @@ export function CalendarGrid({ events, month, year, onDayClick, onMonthChange }:
     list.push(ev)
     eventsByDate.set(ev.event_date, list)
   }
+
+  const meetingDateSet = new Set(meetingSlotDates ?? [])
 
   // First day of the month
   const firstDay = new Date(year, month, 1)
@@ -102,6 +105,7 @@ export function CalendarGrid({ events, month, year, onDayClick, onMonthChange }:
 
           const dateStr = toYMD(year, month, day)
           const dayEvents = eventsByDate.get(dateStr) ?? []
+          const hasMeetingSlots = meetingDateSet.has(dateStr)
           const isToday = dateStr === today
           const isPast = dateStr < today
 
@@ -129,7 +133,13 @@ export function CalendarGrid({ events, month, year, onDayClick, onMonthChange }:
 
               {/* Event dots */}
               <div className="flex flex-wrap gap-0.5 mt-0.5">
-                {dayEvents.slice(0, 3).map((ev) => {
+                {hasMeetingSlots && (
+                  <span
+                    className="inline-block h-1.5 w-1.5 rounded-full shrink-0 bg-amber-400"
+                    title="Gesprekken beschikbaar"
+                  />
+                )}
+                {dayEvents.slice(0, hasMeetingSlots ? 2 : 3).map((ev) => {
                   const color =
                     ev.variant === 'coach'
                       ? (ev.calendar_event_labels?.color ?? '#6366f1')
@@ -143,9 +153,9 @@ export function CalendarGrid({ events, month, year, onDayClick, onMonthChange }:
                     />
                   )
                 })}
-                {dayEvents.length > 3 && (
+                {dayEvents.length > (hasMeetingSlots ? 2 : 3) && (
                   <span className="text-[10px] text-muted-foreground leading-none">
-                    +{dayEvents.length - 3}
+                    +{dayEvents.length - (hasMeetingSlots ? 2 : 3)}
                   </span>
                 )}
               </div>

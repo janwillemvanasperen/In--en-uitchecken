@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Loader2, Plus, Pencil } from 'lucide-react'
 import type { CalendarEvent, CalendarLabel, CalendarStudent, CalendarActionType, CalendarVariant } from './types'
 
@@ -33,6 +34,7 @@ interface CoachEventFormProps {
     title: string
     description?: string
     event_date: string
+    all_day: boolean
     start_time?: string
     end_time?: string
     variant: CalendarVariant
@@ -70,6 +72,7 @@ export function CoachEventFormDialog({
   const [title, setTitle] = useState(event?.title ?? '')
   const [description, setDescription] = useState(event?.description ?? '')
   const [eventDate, setEventDate] = useState(event?.event_date ?? defaultDate ?? '')
+  const [allDay, setAllDay] = useState(event?.all_day ?? false)
   const [startTime, setStartTime] = useState(event?.start_time ?? '')
   const [endTime, setEndTime] = useState(event?.end_time ?? '')
   const [variant, setVariant] = useState<CalendarVariant>(event?.variant ?? 'coach')
@@ -83,6 +86,7 @@ export function CoachEventFormDialog({
       setTitle('')
       setDescription('')
       setEventDate(defaultDate ?? '')
+      setAllDay(false)
       setStartTime('')
       setEndTime('')
       setVariant('coach')
@@ -105,8 +109,9 @@ export function CoachEventFormDialog({
         title,
         description: description || undefined,
         event_date: eventDate,
-        start_time: startTime || undefined,
-        end_time: endTime || undefined,
+        all_day: allDay,
+        start_time: allDay ? undefined : (startTime || undefined),
+        end_time: allDay ? undefined : (endTime || undefined),
         variant,
         student_id: studentId === '__all__' ? null : studentId,
         label_id: labelId === '__none__' ? null : labelId,
@@ -175,7 +180,7 @@ export function CoachEventFormDialog({
             />
           </div>
 
-          {/* Date */}
+          {/* Date + all-day */}
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5 col-span-3 sm:col-span-1">
               <Label htmlFor="cal-date">Datum *</Label>
@@ -187,24 +192,36 @@ export function CoachEventFormDialog({
                 required
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="cal-start">Begintijd</Label>
-              <Input
-                id="cal-start"
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="cal-end">Eindtijd</Label>
-              <Input
-                id="cal-end"
-                type="time"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-              />
-            </div>
+            {!allDay && (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="cal-start">Begintijd</Label>
+                  <Input
+                    id="cal-start"
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="cal-end">Eindtijd</Label>
+                  <Input
+                    id="cal-end"
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="cal-allday"
+              checked={allDay}
+              onCheckedChange={(v) => setAllDay(!!v)}
+            />
+            <Label htmlFor="cal-allday" className="font-normal cursor-pointer">Hele dag</Label>
           </div>
 
           {/* Student targeting (only for coach events) */}
@@ -326,6 +343,7 @@ interface StudentEventFormProps {
     title: string
     description?: string
     event_date: string
+    all_day: boolean
     start_time?: string
     end_time?: string
   }) => Promise<{ error?: string }>
@@ -347,6 +365,7 @@ export function StudentEventFormDialog({
   const [title, setTitle] = useState(event?.title ?? '')
   const [description, setDescription] = useState(event?.description ?? '')
   const [eventDate, setEventDate] = useState(event?.event_date ?? defaultDate ?? '')
+  const [allDay, setAllDay] = useState(event?.all_day ?? false)
   const [startTime, setStartTime] = useState(event?.start_time ?? '')
   const [endTime, setEndTime] = useState(event?.end_time ?? '')
 
@@ -355,6 +374,7 @@ export function StudentEventFormDialog({
       setTitle('')
       setDescription('')
       setEventDate(defaultDate ?? '')
+      setAllDay(false)
       setStartTime('')
       setEndTime('')
     }
@@ -372,8 +392,9 @@ export function StudentEventFormDialog({
         title,
         description: description || undefined,
         event_date: eventDate,
-        start_time: startTime || undefined,
-        end_time: endTime || undefined,
+        all_day: allDay,
+        start_time: allDay ? undefined : (startTime || undefined),
+        end_time: allDay ? undefined : (endTime || undefined),
       })
       if (result.error) {
         setError(result.error)
@@ -431,24 +452,36 @@ export function StudentEventFormDialog({
                 required
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="s-cal-start">Begin</Label>
-              <Input
-                id="s-cal-start"
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="s-cal-end">Einde</Label>
-              <Input
-                id="s-cal-end"
-                type="time"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-              />
-            </div>
+            {!allDay && (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="s-cal-start">Begin</Label>
+                  <Input
+                    id="s-cal-start"
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="s-cal-end">Einde</Label>
+                  <Input
+                    id="s-cal-end"
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="s-cal-allday"
+              checked={allDay}
+              onCheckedChange={(v) => setAllDay(!!v)}
+            />
+            <Label htmlFor="s-cal-allday" className="font-normal cursor-pointer">Hele dag</Label>
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}

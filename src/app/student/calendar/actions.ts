@@ -9,6 +9,7 @@ export interface CreateSharedEventData {
   title: string
   description?: string
   event_date: string
+  all_day: boolean
   start_time?: string
   end_time?: string
 }
@@ -23,8 +24,9 @@ export async function createSharedCalendarEvent(
     title: data.title.trim(),
     description: data.description?.trim() || null,
     event_date: data.event_date,
-    start_time: data.start_time || null,
-    end_time: data.end_time || null,
+    all_day: data.all_day ?? false,
+    start_time: data.all_day ? null : (data.start_time || null),
+    end_time: data.all_day ? null : (data.end_time || null),
     variant: 'shared',
     created_by: student.id,
     student_id: student.id,
@@ -61,8 +63,12 @@ export async function updateSharedCalendarEvent(
   if (data.title !== undefined) updates.title = data.title.trim()
   if (data.description !== undefined) updates.description = data.description?.trim() || null
   if (data.event_date !== undefined) updates.event_date = data.event_date
-  if (data.start_time !== undefined) updates.start_time = data.start_time || null
-  if (data.end_time !== undefined) updates.end_time = data.end_time || null
+  if (data.all_day !== undefined) {
+    updates.all_day = data.all_day
+    if (data.all_day) { updates.start_time = null; updates.end_time = null }
+  }
+  if (data.start_time !== undefined && !data.all_day) updates.start_time = data.start_time || null
+  if (data.end_time !== undefined && !data.all_day) updates.end_time = data.end_time || null
 
   const { error } = await supabase
     .from('calendar_events')
@@ -100,5 +106,40 @@ export async function deleteSharedCalendarEvent(eventId: string): Promise<{ erro
 
   revalidatePath('/student/calendar')
   revalidatePath('/student/dashboard')
+  return {}
+}
+
+// ─── Meeting bookings ─────────────────────────────────────────────────────────
+
+export async function bookMeetingSlot(slotId: string): Promise<{ error?: string }> {
+  const student = await requireStudent()
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('meeting_bookings')
+    .insert({ slot_id: slotId, student_id: student.id })
+
+  if (error) {
+    if (error.code === '23505') return { error: 'Je hebt dit tijdslot al geboekt' }
+    return { error: error.message }
+  }
+
+  revalidatePath('/student/calendar')
+  return {}
+}
+
+export async function cancelMeetingBooking(slotId: string): Promise<{ error?: string }> {
+  const student = await requireStudent()
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('meeting_bookings')
+    .delete()
+    .eq('slot_id', slotId)
+    .eq('student_id', student.id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/student/calendar')
   return {}
 }

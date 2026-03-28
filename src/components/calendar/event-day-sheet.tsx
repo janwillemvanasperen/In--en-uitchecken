@@ -2,11 +2,20 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Lock, Pencil, Trash2, Loader2, Users } from 'lucide-react'
+import { Lock, Pencil, Trash2, Loader2, Users, EyeOff, Eye } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import type { CalendarEvent, CalendarLabel, CalendarStudent, CalendarVariant, CalendarActionType } from './types'
+import type {
+  CalendarEvent,
+  CalendarLabel,
+  CalendarStudent,
+  CalendarVariant,
+  CalendarActionType,
+  MeetingCycle,
+  MeetingSlotCoach,
+  MeetingSlotStudent,
+} from './types'
 import { ACTION_TYPE_DEFAULTS } from './types'
 import { CoachEventFormDialog, StudentEventFormDialog } from './event-form-dialog'
 
@@ -14,6 +23,7 @@ interface CoachEventData {
   title: string
   description?: string
   event_date: string
+  all_day: boolean
   start_time?: string
   end_time?: string
   variant: CalendarVariant
@@ -27,6 +37,7 @@ interface SharedEventCreateData {
   title: string
   description?: string
   event_date: string
+  all_day: boolean
   start_time?: string
   end_time?: string
 }
@@ -35,6 +46,7 @@ interface SharedEventUpdateData {
   title?: string
   description?: string
   event_date?: string
+  all_day?: boolean
   start_time?: string
   end_time?: string
 }
@@ -51,7 +63,8 @@ function formatDutchDate(dateStr: string): string {
   return `${DUTCH_DAY_NAMES[d.getDay()]} ${day} ${DUTCH_MONTH_NAMES[month - 1]} ${year}`
 }
 
-function formatTimeRange(start: string | null, end: string | null): string | null {
+function formatTimeRange(allDay: boolean, start: string | null, end: string | null): string | null {
+  if (allDay) return 'Hele dag'
   if (!start) return null
   return end ? `${start} – ${end}` : start
 }
@@ -65,7 +78,7 @@ function LabelDot({ color }: { color: string }) {
   )
 }
 
-// ─── Coach variant of the sheet ───────────────────────────────────────────────
+// ─── Coach variant ────────────────────────────────────────────────────────────
 
 interface CoachDaySheetProps {
   dateStr: string | null
@@ -73,10 +86,12 @@ interface CoachDaySheetProps {
   students: CalendarStudent[]
   labels: CalendarLabel[]
   currentUserId: string
+  meetingSlots: MeetingSlotCoach[]
   onClose: () => void
   onCreateEvent: (data: CoachEventData) => Promise<{ error?: string }>
   onUpdateEvent: (id: string, data: CoachEventData) => Promise<{ error?: string }>
   onDeleteEvent: (id: string) => Promise<{ error?: string }>
+  onToggleSlotAvailability: (slotId: string, available: boolean) => Promise<{ error?: string }>
 }
 
 export function CoachDaySheet({
@@ -85,13 +100,16 @@ export function CoachDaySheet({
   students,
   labels,
   currentUserId,
+  meetingSlots,
   onClose,
   onCreateEvent,
   onUpdateEvent,
   onDeleteEvent,
+  onToggleSlotAvailability,
 }: CoachDaySheetProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [pendingSlotId, setPendingSlotId] = useState<string | null>(null)
 
   const dayEvents = dateStr
     ? events.filter((e) => e.event_date === dateStr).sort((a, b) => {
@@ -110,6 +128,14 @@ export function CoachDaySheet({
     })
   }
 
+  function handleToggleSlot(slotId: string, current: boolean) {
+    setPendingSlotId(slotId)
+    startTransition(async () => {
+      await onToggleSlotAvailability(slotId, !current)
+      setPendingSlotId(null)
+    })
+  }
+
   return (
     <Dialog open={!!dateStr} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-md">
@@ -120,7 +146,7 @@ export function CoachDaySheet({
             </DialogHeader>
 
             <div className="py-4 space-y-3">
-              {dayEvents.length === 0 && (
+              {dayEvents.length === 0 && meetingSlots.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">
                   Geen items op deze dag
                 </p>
@@ -128,7 +154,7 @@ export function CoachDaySheet({
 
               {dayEvents.map((ev) => {
                 const isOwner = ev.created_by === currentUserId
-                const timeRange = formatTimeRange(ev.start_time, ev.end_time)
+                const timeRange = formatTimeRange(ev.all_day, ev.start_time, ev.end_time)
                 const labelColor = ev.calendar_event_labels?.color
 
                 return (
@@ -148,7 +174,6 @@ export function CoachDaySheet({
                           )}
                         </div>
                       </div>
-                      {/* Edit / delete — only for owner */}
                       {isOwner && (
                         <div className="flex items-center gap-1 shrink-0">
                           <CoachEventFormDialog
@@ -178,7 +203,6 @@ export function CoachDaySheet({
                       )}
                     </div>
 
-                    {/* Label badge */}
                     {ev.calendar_event_labels && (
                       <div className="flex items-center gap-1.5">
                         <LabelDot color={ev.calendar_event_labels.color} />
@@ -188,21 +212,63 @@ export function CoachDaySheet({
                       </div>
                     )}
 
-                    {/* Description */}
                     {ev.description && (
                       <p className="text-xs text-muted-foreground line-clamp-3">{ev.description}</p>
                     )}
 
-                    {/* Student targeting info */}
                     {ev.variant === 'coach' && !ev.student_id && (
                       <Badge variant="outline" className="text-xs">Alle studenten</Badge>
                     )}
                   </div>
                 )
               })}
+
+              {/* Meeting slots for this day */}
+              {meetingSlots.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-amber-600 uppercase tracking-wide">Gesprekken</p>
+                  {meetingSlots.map((slot) => {
+                    const isLoading = pendingSlotId === slot.id && isPending
+                    return (
+                      <div
+                        key={slot.id}
+                        className={`flex items-center justify-between rounded-lg border px-3 py-2 ${
+                          !slot.available ? 'opacity-50 bg-muted/30' : ''
+                        }`}
+                      >
+                        <div>
+                          <p className="text-sm font-medium tabular-nums">
+                            {slot.start_time} – {slot.end_time}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{slot.cycle_title}</p>
+                          {slot.booked_student && (
+                            <p className="text-xs text-green-700 dark:text-green-400 font-medium">
+                              {slot.booked_student.full_name}
+                            </p>
+                          )}
+                        </div>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() => handleToggleSlot(slot.id, slot.available)}
+                          disabled={isLoading || !!slot.booked_student}
+                          title={slot.available ? 'Blokkeren' : 'Vrijgeven'}
+                        >
+                          {isLoading
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            : slot.available
+                              ? <EyeOff className="h-3.5 w-3.5" />
+                              : <Eye className="h-3.5 w-3.5" />
+                          }
+                        </Button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
 
-            {/* Add button */}
             <div className="border-t pt-3">
               <CoachEventFormDialog
                 students={students}
@@ -226,29 +292,39 @@ export function CoachDaySheet({
   )
 }
 
-// ─── Student variant of the sheet ─────────────────────────────────────────────
+// ─── Student variant ──────────────────────────────────────────────────────────
 
 interface StudentDaySheetProps {
   dateStr: string | null
   events: CalendarEvent[]
   currentUserId: string
+  meetingSlots: MeetingSlotStudent[]
+  meetingCycles: MeetingCycle[]
   onClose: () => void
   onCreateEvent: (data: SharedEventCreateData) => Promise<{ error?: string }>
   onUpdateEvent: (id: string, data: SharedEventUpdateData) => Promise<{ error?: string }>
   onDeleteEvent: (id: string) => Promise<{ error?: string }>
+  onBookSlot: (slotId: string) => Promise<{ error?: string }>
+  onCancelBooking: (slotId: string) => Promise<{ error?: string }>
 }
 
 export function StudentDaySheet({
   dateStr,
   events,
   currentUserId,
+  meetingSlots,
+  meetingCycles,
   onClose,
   onCreateEvent,
   onUpdateEvent,
   onDeleteEvent,
+  onBookSlot,
+  onCancelBooking,
 }: StudentDaySheetProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [pendingSlotId, setPendingSlotId] = useState<string | null>(null)
+  const [slotError, setSlotError] = useState<string | null>(null)
 
   const dayEvents = dateStr
     ? events.filter((e) => e.event_date === dateStr).sort((a, b) => {
@@ -267,6 +343,28 @@ export function StudentDaySheet({
     })
   }
 
+  function handleBook(slotId: string) {
+    setPendingSlotId(slotId)
+    setSlotError(null)
+    startTransition(async () => {
+      const r = await onBookSlot(slotId)
+      if (r.error) setSlotError(r.error)
+      setPendingSlotId(null)
+    })
+  }
+
+  function handleCancel(slotId: string) {
+    setPendingSlotId(slotId)
+    setSlotError(null)
+    startTransition(async () => {
+      const r = await onCancelBooking(slotId)
+      if (r.error) setSlotError(r.error)
+      setPendingSlotId(null)
+    })
+  }
+
+  const cycleMap = new Map(meetingCycles.map((c) => [c.id, c]))
+
   return (
     <Dialog open={!!dateStr} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-md">
@@ -277,7 +375,7 @@ export function StudentDaySheet({
             </DialogHeader>
 
             <div className="py-4 space-y-3">
-              {dayEvents.length === 0 && (
+              {dayEvents.length === 0 && meetingSlots.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">
                   Geen items op deze dag
                 </p>
@@ -286,7 +384,7 @@ export function StudentDaySheet({
               {dayEvents.map((ev) => {
                 const isOwnShared = ev.variant === 'shared' && ev.student_id === currentUserId
                 const isCoachEvent = ev.variant === 'coach'
-                const timeRange = formatTimeRange(ev.start_time, ev.end_time)
+                const timeRange = formatTimeRange(ev.all_day, ev.start_time, ev.end_time)
                 const labelColor = ev.calendar_event_labels?.color
                 const actionInfo = ev.action_type ? ACTION_TYPE_DEFAULTS[ev.action_type] : null
                 const buttonLabel = ev.action_label || actionInfo?.label
@@ -305,7 +403,6 @@ export function StudentDaySheet({
                         </div>
                       </div>
 
-                      {/* Edit/delete for own shared events */}
                       {isOwnShared && (
                         <div className="flex items-center gap-1 shrink-0">
                           <StudentEventFormDialog
@@ -333,7 +430,6 @@ export function StudentDaySheet({
                       )}
                     </div>
 
-                    {/* Label */}
                     {ev.calendar_event_labels && (
                       <div className="flex items-center gap-1.5">
                         <LabelDot color={ev.calendar_event_labels.color} />
@@ -343,12 +439,10 @@ export function StudentDaySheet({
                       </div>
                     )}
 
-                    {/* Description */}
                     {ev.description && (
                       <p className="text-sm text-muted-foreground">{ev.description}</p>
                     )}
 
-                    {/* Action button */}
                     {actionInfo && buttonLabel && (
                       <Link href={actionInfo.href}>
                         <Button
@@ -362,9 +456,68 @@ export function StudentDaySheet({
                   </div>
                 )
               })}
+
+              {/* Meeting slots */}
+              {meetingSlots.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-amber-600 uppercase tracking-wide">Gesprekken</p>
+                  {slotError && (
+                    <p className="text-sm text-destructive">{slotError}</p>
+                  )}
+                  {meetingSlots.map((slot) => {
+                    const cycle = cycleMap.get(slot.cycle_id)
+                    const isLoading = pendingSlotId === slot.id && isPending
+                    return (
+                      <div
+                        key={slot.id}
+                        className="flex items-center justify-between rounded-lg border px-3 py-2"
+                      >
+                        <div>
+                          <p className="text-sm font-medium tabular-nums">
+                            {slot.start_time} – {slot.end_time}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{slot.cycle_title}</p>
+                        </div>
+                        <div>
+                          {slot.isMyBooking ? (
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs text-green-700 border-green-400">
+                                Mijn afspraak
+                              </Badge>
+                              {cycle?.status === 'active' && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 px-2 text-xs text-destructive hover:text-destructive"
+                                  onClick={() => handleCancel(slot.id)}
+                                  disabled={isLoading}
+                                >
+                                  {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Annuleren'}
+                                </Button>
+                              )}
+                            </div>
+                          ) : slot.isBooked ? (
+                            <Badge variant="secondary" className="text-xs">Bezet</Badge>
+                          ) : cycle?.status === 'active' ? (
+                            <Button
+                              size="sm"
+                              className="h-7 px-3 text-xs bg-[#ffd100] text-black hover:bg-[#ffd100]/90"
+                              onClick={() => handleBook(slot.id)}
+                              disabled={isLoading}
+                            >
+                              {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Inschrijven'}
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Vrij</span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
 
-            {/* Add shared event */}
             <div className="border-t pt-3">
               <StudentEventFormDialog
                 defaultDate={dateStr}
