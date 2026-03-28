@@ -115,6 +115,16 @@ export async function bookMeetingSlot(slotId: string): Promise<{ error?: string 
   const student = await requireStudent()
   const supabase = await createClient()
 
+  // Verify slot is still available before booking
+  const { data: slot } = await supabase
+    .from('meeting_slots')
+    .select('available')
+    .eq('id', slotId)
+    .single()
+
+  if (!slot) return { error: 'Tijdslot niet gevonden' }
+  if (!slot.available) return { error: 'Dit tijdslot is niet meer beschikbaar' }
+
   const { error } = await supabase
     .from('meeting_bookings')
     .insert({ slot_id: slotId, student_id: student.id })

@@ -81,7 +81,7 @@ export default async function CoachCalendarPage() {
       end_time: s.end_time,
       available: s.available,
       notes: s.notes ?? null,
-      booked_student: booking
+      booked_student: booking?.users
         ? { id: booking.users.id, full_name: booking.users.full_name }
         : null,
     }
