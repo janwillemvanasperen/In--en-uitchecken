@@ -23,7 +23,15 @@ interface CoachEventData {
   action_label?: string
 }
 
-interface SharedEventData {
+interface SharedEventCreateData {
+  title: string
+  description?: string
+  event_date: string
+  start_time?: string
+  end_time?: string
+}
+
+interface SharedEventUpdateData {
   title?: string
   description?: string
   event_date?: string
@@ -225,8 +233,8 @@ interface StudentDaySheetProps {
   events: CalendarEvent[]
   currentUserId: string
   onClose: () => void
-  onCreateEvent: (data: Omit<SharedEventData, 'title'> & { title: string }) => Promise<{ error?: string }>
-  onUpdateEvent: (id: string, data: SharedEventData) => Promise<{ error?: string }>
+  onCreateEvent: (data: SharedEventCreateData) => Promise<{ error?: string }>
+  onUpdateEvent: (id: string, data: SharedEventUpdateData) => Promise<{ error?: string }>
   onDeleteEvent: (id: string) => Promise<{ error?: string }>
 }
 
