@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   Menu, LayoutDashboard, Users, Briefcase, FileText,
-  GitCompare, Settings, Bell
+  GitCompare, Settings, Bell, CalendarDays
 } from 'lucide-react'
 
 const navItems = [
@@ -18,6 +18,7 @@ const navItems = [
   { href: '/coach/students', label: 'Studenten', icon: Users },
   { href: '/coach/work', label: 'Ingediend Werk', icon: Briefcase, comingSoon: true },
   { href: '/coach/notes', label: 'Notities', icon: FileText },
+  { href: '/coach/calendar', label: 'Kalender', icon: CalendarDays },
   { href: '/coach/compare', label: 'Vergelijken', icon: GitCompare },
   { href: '/coach/settings', label: 'Instellingen', icon: Settings },
 ]
