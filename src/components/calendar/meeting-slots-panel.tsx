@@ -87,7 +87,7 @@ export function CoachMeetingCyclePanel({
               size="sm"
               variant="ghost"
               className="h-7 px-2 text-xs"
-              onClick={() => startTransition(() => onCloseCycle(cycle.id))}
+              onClick={() => startTransition(async () => { await onCloseCycle(cycle.id) })}
               disabled={isPending}
             >
               Sluiten
@@ -97,7 +97,7 @@ export function CoachMeetingCyclePanel({
             size="icon"
             variant="ghost"
             className="h-7 w-7 text-destructive hover:text-destructive"
-            onClick={() => startTransition(() => onDeleteCycle(cycle.id))}
+            onClick={() => startTransition(async () => { await onDeleteCycle(cycle.id) })}
             disabled={isPending}
           >
             <Trash2 className="h-3.5 w-3.5" />
