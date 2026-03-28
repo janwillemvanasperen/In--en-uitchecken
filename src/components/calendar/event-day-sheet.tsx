@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { Lock, Pencil, Trash2, Loader2, Users } from 'lucide-react'
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import type { CalendarEvent, CalendarLabel, CalendarStudent, CalendarVariant, CalendarActionType } from './types'
@@ -103,13 +103,13 @@ export function CoachDaySheet({
   }
 
   return (
-    <Sheet open={!!dateStr} onOpenChange={(o) => { if (!o) onClose() }}>
-      <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto rounded-t-xl">
+    <Dialog open={!!dateStr} onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-md">
         {dateStr && (
           <>
-            <SheetHeader className="pb-3 border-b">
-              <SheetTitle className="capitalize">{formatDutchDate(dateStr)}</SheetTitle>
-            </SheetHeader>
+            <DialogHeader className="pb-3 border-b">
+              <DialogTitle className="capitalize">{formatDutchDate(dateStr)}</DialogTitle>
+            </DialogHeader>
 
             <div className="py-4 space-y-3">
               {dayEvents.length === 0 && (
@@ -213,8 +213,8 @@ export function CoachDaySheet({
             </div>
           </>
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -260,13 +260,13 @@ export function StudentDaySheet({
   }
 
   return (
-    <Sheet open={!!dateStr} onOpenChange={(o) => { if (!o) onClose() }}>
-      <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto rounded-t-xl">
+    <Dialog open={!!dateStr} onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-md">
         {dateStr && (
           <>
-            <SheetHeader className="pb-3 border-b">
-              <SheetTitle className="capitalize">{formatDutchDate(dateStr)}</SheetTitle>
-            </SheetHeader>
+            <DialogHeader className="pb-3 border-b">
+              <DialogTitle className="capitalize">{formatDutchDate(dateStr)}</DialogTitle>
+            </DialogHeader>
 
             <div className="py-4 space-y-3">
               {dayEvents.length === 0 && (
@@ -370,7 +370,7 @@ export function StudentDaySheet({
             </div>
           </>
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   )
 }
