@@ -130,8 +130,7 @@ export function UpcomingEventsCard({ events, bookedSlots = [] }: UpcomingEventsC
                 </div>
               </div>
             )
-          })
-        )}
+          })}
 
         {/* Link to full calendar */}
         <Link
