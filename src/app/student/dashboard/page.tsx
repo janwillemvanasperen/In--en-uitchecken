@@ -5,12 +5,14 @@ import { CheckInHistoryCard } from '@/components/student/check-in-history-card'
 import { ProgressAndLeaveCard } from '@/components/student/progress-and-leave-card'
 import { WeekScheduleCard } from '@/components/student/week-schedule-card'
 import { DevelopmentGoalsCard } from '@/components/student/development-goals-card'
+import { UpcomingEventsCard } from '@/components/student/upcoming-events-card'
 import { getMonday, toLocalDateStr } from '@/lib/date-utils'
 import type { DayData } from '@/components/student/week-history-view'
 import { createAdminClient } from '@/lib/supabase/server'
 import { CalendarClock } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import type { CalendarEvent } from '@/components/calendar/types'
 
 export default async function StudentDashboard() {
   const user = await requireStudent()
@@ -196,6 +198,19 @@ export default async function StudentDashboard() {
     .order('created_at', { ascending: false })
     .limit(3)
 
+  // Upcoming calendar events (next 14 days)
+  const in14Days = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000)
+  const { data: upcomingEventsRaw } = await supabase
+    .from('calendar_events')
+    .select('*, calendar_event_labels(id, name, color)')
+    .gte('event_date', todayStr)
+    .lte('event_date', toLocalDateStr(in14Days))
+    .order('event_date', { ascending: true })
+    .order('start_time', { ascending: true, nullsFirst: false })
+    .limit(5)
+
+  const upcomingEvents: CalendarEvent[] = upcomingEventsRaw ?? []
+
   return (
     <div className="space-y-6">
       {/* Schedule push banner */}
@@ -261,6 +276,8 @@ export default async function StudentDashboard() {
       </div>
 
       <DevelopmentGoalsCard goalPhases={goalPhases} goalNames={finalGoalNames} />
+
+      <UpcomingEventsCard events={upcomingEvents} />
     </div>
   )
 }

@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import { Users, MapPin, Calendar, Clock, FileText, Settings, ClipboardCheck, GraduationCap, UserCheck, Target, Tag, Send } from 'lucide-react'
+import { Users, MapPin, Calendar, Clock, FileText, Settings, ClipboardCheck, GraduationCap, UserCheck, Target, Tag, Send, CalendarDays } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,6 +59,7 @@ export default async function AdminDashboard() {
       items: [
         { title: 'Ontwikkeldoelen', description: 'Beheer doelnamen en fases', href: '/admin/development-goals', icon: Target },
         { title: 'Notitie labels', description: 'Beheer labels voor coach notities', href: '/admin/note-labels', icon: Tag },
+        { title: 'Kalender labels', description: 'Beheer labels voor kalender-items', href: '/admin/calendar-labels', icon: CalendarDays },
         { title: 'Instellingen', description: 'Systeeminstellingen en dagcapaciteit', href: '/admin/settings', icon: Settings },
       ],
     },
