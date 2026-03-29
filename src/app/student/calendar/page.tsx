@@ -33,13 +33,15 @@ export default async function StudentCalendarPage() {
       .order('event_date', { ascending: true })
       .order('start_time', { ascending: true, nullsFirst: false }),
 
-    // Meeting cycles from the student's coach
+    // Meeting cycles from the student's coach that target this student
+    // (target_student_ids IS NULL = all students, or contains this student's id)
     coachId
       ? supabase
           .from('meeting_cycles')
           .select('*')
           .eq('coach_id', coachId)
           .eq('status', 'active')
+          .or(`target_student_ids.is.null,target_student_ids.cs.{${user.id}}`)
           .order('date_from', { ascending: true })
       : Promise.resolve({ data: [] }),
 
@@ -54,7 +56,7 @@ export default async function StudentCalendarPage() {
             start_time,
             end_time,
             available,
-            meeting_cycles!inner(title, coach_id, status),
+            meeting_cycles!inner(title, coach_id, status, target_student_ids),
             meeting_bookings(student_id)
           `)
           .eq('meeting_cycles.coach_id', coachId)
@@ -75,8 +77,11 @@ export default async function StudentCalendarPage() {
   const meetingCycles: MeetingCycle[] = cyclesRaw ?? []
   const myBookedSlotIds = new Set((bookingsRaw ?? []).map((b: any) => b.slot_id))
 
-  // Build MeetingSlotStudent[] — never expose which other student booked a slot
-  const meetingSlots: MeetingSlotStudent[] = (slotsRaw ?? []).map((s: any) => {
+  // Build MeetingSlotStudent[] — filter by targeting, never expose who booked
+  const meetingSlots: MeetingSlotStudent[] = (slotsRaw ?? []).filter((s: any) => {
+    const targets: string[] | null = s.meeting_cycles?.target_student_ids ?? null
+    return targets === null || targets.includes(user.id)
+  }).map((s: any) => {
     const isBooked = (s.meeting_bookings?.length ?? 0) > 0
     const isMyBooking = myBookedSlotIds.has(s.id)
     return {

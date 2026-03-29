@@ -39,7 +39,7 @@ export default async function CoachCalendarPage() {
 
     supabase
       .from('meeting_cycles')
-      .select('*')
+      .select('*, target_student_ids')
       .eq('coach_id', user.id)
       .order('date_from', { ascending: false }),
 

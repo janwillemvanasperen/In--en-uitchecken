@@ -71,7 +71,7 @@ export function CoachCalendarView({
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h2 className="text-lg font-semibold">Kalender</h2>
         <div className="flex items-center gap-2">
-          <MeetingCycleFormDialog onSubmit={createMeetingCycle} />
+          <MeetingCycleFormDialog students={students} onSubmit={createMeetingCycle} />
           <CoachEventFormDialog
             students={students}
             labels={labels}

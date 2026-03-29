@@ -39,6 +39,7 @@ interface CoachEventFormProps {
     end_time?: string
     variant: CalendarVariant
     student_id?: string | null
+    target_student_ids?: string[] | null
     label_id?: string | null
     action_type?: CalendarActionType | null
     action_label?: string
@@ -76,10 +77,24 @@ export function CoachEventFormDialog({
   const [startTime, setStartTime] = useState(event?.start_time ?? '')
   const [endTime, setEndTime] = useState(event?.end_time ?? '')
   const [variant, setVariant] = useState<CalendarVariant>(event?.variant ?? 'coach')
-  const [studentId, setStudentId] = useState(event?.student_id ?? '__all__')
+  // For coach events: targeting
+  const [targetAll, setTargetAll] = useState(
+    event?.variant === 'coach' ? (event?.target_student_ids == null) : true
+  )
+  const [targetStudentIds, setTargetStudentIds] = useState<string[]>(
+    event?.variant === 'coach' ? (event?.target_student_ids ?? []) : []
+  )
+  // For shared events: single student owner
+  const [studentId, setStudentId] = useState(event?.variant === 'shared' ? (event?.student_id ?? '') : '')
   const [labelId, setLabelId] = useState(event?.label_id ?? '__none__')
   const [actionType, setActionType] = useState<string>(event?.action_type ?? '__none__')
   const [actionLabel, setActionLabel] = useState(event?.action_label ?? '')
+
+  function toggleTargetStudent(id: string) {
+    setTargetStudentIds((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
+    )
+  }
 
   function resetForm() {
     if (!isEditing) {
@@ -90,7 +105,9 @@ export function CoachEventFormDialog({
       setStartTime('')
       setEndTime('')
       setVariant('coach')
-      setStudentId('__all__')
+      setTargetAll(true)
+      setTargetStudentIds([])
+      setStudentId('')
       setLabelId('__none__')
       setActionType('__none__')
       setActionLabel('')
@@ -102,6 +119,10 @@ export function CoachEventFormDialog({
     e.preventDefault()
     if (!title.trim()) { setError('Titel is verplicht'); return }
     if (!eventDate) { setError('Datum is verplicht'); return }
+    if (variant === 'shared' && !studentId) { setError('Selecteer een student'); return }
+    if (variant === 'coach' && !targetAll && targetStudentIds.length === 0) {
+      setError('Selecteer minimaal één student of kies "Alle studenten"'); return
+    }
     setError(null)
 
     startTransition(async () => {
@@ -113,7 +134,8 @@ export function CoachEventFormDialog({
         start_time: allDay ? undefined : (startTime || undefined),
         end_time: allDay ? undefined : (endTime || undefined),
         variant,
-        student_id: studentId === '__all__' ? null : studentId,
+        student_id: variant === 'shared' ? studentId : null,
+        target_student_ids: variant === 'coach' ? (targetAll ? null : targetStudentIds) : null,
         label_id: labelId === '__none__' ? null : labelId,
         action_type: actionType === '__none__' ? null : (actionType as CalendarActionType),
         action_label: actionLabel || undefined,
@@ -224,29 +246,41 @@ export function CoachEventFormDialog({
             <Label htmlFor="cal-allday" className="font-normal cursor-pointer">Hele dag</Label>
           </div>
 
-          {/* Student targeting (only for coach events) */}
+          {/* Student targeting for coach events */}
           {variant === 'coach' && (
-            <div className="space-y-1.5">
-              <Label>Voor student</Label>
-              <Select value={studentId} onValueChange={setStudentId}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">Alle studenten</SelectItem>
+            <div className="space-y-2">
+              <Label>Voor wie</Label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={targetAll}
+                  onCheckedChange={(v) => { setTargetAll(!!v); if (v) setTargetStudentIds([]) }}
+                />
+                <span className="text-sm font-medium">Alle studenten</span>
+              </label>
+              {!targetAll && (
+                <div className="pl-6 space-y-1.5 max-h-36 overflow-y-auto border rounded-md p-2">
+                  {students.length === 0 && (
+                    <p className="text-xs text-muted-foreground">Geen studenten gevonden</p>
+                  )}
                   {students.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>
+                    <label key={s.id} className="flex items-center gap-2 cursor-pointer">
+                      <Checkbox
+                        checked={targetStudentIds.includes(s.id)}
+                        onCheckedChange={() => toggleTargetStudent(s.id)}
+                      />
+                      <span className="text-sm">{s.full_name}</span>
+                    </label>
                   ))}
-                </SelectContent>
-              </Select>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Student targeting (required for shared events) */}
+          {/* Student owner for shared events */}
           {variant === 'shared' && (
             <div className="space-y-1.5">
               <Label>Student *</Label>
-              <Select value={studentId === '__all__' ? '' : studentId} onValueChange={setStudentId}>
+              <Select value={studentId} onValueChange={setStudentId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecteer een student" />
                 </SelectTrigger>

@@ -18,6 +18,7 @@ export interface CalendarEvent {
   variant: CalendarVariant
   created_by: string
   student_id: string | null
+  target_student_ids: string[] | null  // null = all students; array = specific
   label_id: string | null
   action_type: CalendarActionType | null
   action_label: string | null
@@ -50,6 +51,7 @@ export interface MeetingCycle {
   day_end_time: string   // HH:mm
   slot_duration: number  // minutes
   status: 'active' | 'closed'
+  target_student_ids: string[] | null  // null = all students; array = specific
   created_at: string
 }
 

@@ -16,7 +16,10 @@ export interface CreateCalendarEventData {
   start_time?: string
   end_time?: string
   variant: CalendarVariant
+  // For shared events: the owning student; for coach events: leave null
   student_id?: string | null
+  // For coach events: null = all students, array = specific students
+  target_student_ids?: string[] | null
   label_id?: string | null
   action_type?: CalendarActionType | null
   action_label?: string
@@ -35,7 +38,8 @@ export async function createCalendarEvent(data: CreateCalendarEventData): Promis
     end_time: data.all_day ? null : (data.end_time || null),
     variant: data.variant,
     created_by: coach.id,
-    student_id: data.student_id || null,
+    student_id: data.variant === 'shared' ? (data.student_id || null) : null,
+    target_student_ids: data.variant === 'coach' ? (data.target_student_ids ?? null) : null,
     label_id: data.label_id || null,
     action_type: data.action_type || null,
     action_label: data.action_label?.trim() || null,
@@ -79,6 +83,7 @@ export async function updateCalendarEvent(
   if (data.start_time !== undefined && !data.all_day) updates.start_time = data.start_time || null
   if (data.end_time !== undefined && !data.all_day) updates.end_time = data.end_time || null
   if (data.student_id !== undefined) updates.student_id = data.student_id || null
+  if (data.target_student_ids !== undefined) updates.target_student_ids = data.target_student_ids ?? null
   if (data.label_id !== undefined) updates.label_id = data.label_id || null
   if (data.action_type !== undefined) updates.action_type = data.action_type || null
   if (data.action_label !== undefined) updates.action_label = data.action_label?.trim() || null
@@ -124,6 +129,8 @@ export interface CreateMeetingCycleData {
   day_start_time: string
   day_end_time: string
   slot_duration: number
+  // null = all students of this coach; array = specific students
+  target_student_ids?: string[] | null
 }
 
 /** Generate all slot records for a cycle and insert them in bulk. */
@@ -174,6 +181,7 @@ export async function createMeetingCycle(data: CreateMeetingCycleData): Promise<
       day_start_time: data.day_start_time,
       day_end_time: data.day_end_time,
       slot_duration: data.slot_duration,
+      target_student_ids: data.target_student_ids ?? null,
     })
     .select('id')
     .single()
