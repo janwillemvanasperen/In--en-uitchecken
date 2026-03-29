@@ -11,14 +11,26 @@ export default async function StudentCalendarPage() {
   const supabase = await createClient()
   const adminSupabase = createAdminClient()
 
-  // First get the student's coach_id
+  // users.coach_id = coaches entity-ID; meeting_cycles.coach_id = auth user-ID van de coach
+  // Dus we moeten de auth user-ID ophalen via de coaches tabel
   const { data: studentProfile } = await supabase
     .from('users')
     .select('coach_id')
     .eq('id', user.id)
     .single()
 
-  const coachId = studentProfile?.coach_id
+  const coachEntityId = studentProfile?.coach_id ?? null
+
+  // Haal de auth user-ID van de coach op via de coaches tabel
+  let coachAuthUserId: string | null = null
+  if (coachEntityId) {
+    const { data: coachRecord } = await adminSupabase
+      .from('coaches')
+      .select('user_id')
+      .eq('id', coachEntityId)
+      .single()
+    coachAuthUserId = coachRecord?.user_id ?? null
+  }
 
   const [
     { data: eventsRaw },
@@ -35,18 +47,18 @@ export default async function StudentCalendarPage() {
 
     // Meeting cycles from the student's coach that target this student
     // (target_student_ids IS NULL = all students, or contains this student's id)
-    coachId
+    coachAuthUserId
       ? supabase
           .from('meeting_cycles')
           .select('*')
-          .eq('coach_id', coachId)
+          .eq('coach_id', coachAuthUserId)
           .eq('status', 'active')
           .or(`target_student_ids.is.null,target_student_ids.cs.{${user.id}}`)
           .order('date_from', { ascending: true })
       : Promise.resolve({ data: [] }),
 
     // All slots for those cycles (use adminClient to count bookings without exposing students)
-    coachId
+    coachAuthUserId
       ? adminSupabase
           .from('meeting_slots')
           .select(`
@@ -59,7 +71,7 @@ export default async function StudentCalendarPage() {
             meeting_cycles!inner(title, coach_id, status, target_student_ids),
             meeting_bookings(student_id)
           `)
-          .eq('meeting_cycles.coach_id', coachId)
+          .eq('meeting_cycles.coach_id', coachAuthUserId)
           .eq('meeting_cycles.status', 'active')
           .eq('available', true)
           .order('slot_date', { ascending: true })
