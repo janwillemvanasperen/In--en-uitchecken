@@ -14,6 +14,8 @@ SET target_student_ids = ARRAY[student_id]
 WHERE variant = 'coach' AND student_id IS NOT NULL;
 
 -- Drop and replace the student SELECT policy to understand target_student_ids
+-- NOTE: users.coach_id references coaches.id (entity), not auth.users.id
+-- So we must join through coaches to match calendar_events.created_by (= auth.users.id)
 DROP POLICY IF EXISTS "Studenten zien relevante kalenderitems" ON public.calendar_events;
 
 CREATE POLICY "Studenten zien relevante kalenderitems"
@@ -29,8 +31,10 @@ CREATE POLICY "Studenten zien relevante kalenderitems"
         variant = 'coach'
         AND target_student_ids IS NULL
         AND EXISTS (
-          SELECT 1 FROM public.users
-          WHERE id = auth.uid() AND coach_id = calendar_events.created_by
+          SELECT 1 FROM public.users u
+          JOIN public.coaches c ON c.id = u.coach_id
+          WHERE u.id = auth.uid()
+          AND c.user_id = calendar_events.created_by
         )
       )
 
