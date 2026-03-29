@@ -68,6 +68,15 @@ export interface MeetingSlotCoach {
   booked_student: { id: string; full_name: string } | null
 }
 
+/** Upcoming booked slot for student dashboard display */
+export interface UpcomingMeetingSlot {
+  id: string
+  slot_date: string
+  start_time: string
+  end_time: string
+  cycle_title: string
+}
+
 /** Slot as seen by a student (privacy: only knows if taken, not by whom) */
 export interface MeetingSlotStudent {
   id: string

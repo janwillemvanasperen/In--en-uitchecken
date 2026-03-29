@@ -47,8 +47,9 @@ export default async function StudentCalendarPage() {
 
     // Meeting cycles from the student's coach that target this student
     // (target_student_ids IS NULL = all students, or contains this student's id)
+    // Use adminClient: students have no SELECT policy on meeting_cycles
     coachAuthUserId
-      ? supabase
+      ? adminSupabase
           .from('meeting_cycles')
           .select('*')
           .eq('coach_id', coachAuthUserId)

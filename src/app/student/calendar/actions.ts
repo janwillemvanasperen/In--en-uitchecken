@@ -2,7 +2,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { requireStudent } from '@/lib/auth'
 
 export interface CreateSharedEventData {
@@ -114,9 +114,10 @@ export async function deleteSharedCalendarEvent(eventId: string): Promise<{ erro
 export async function bookMeetingSlot(slotId: string): Promise<{ error?: string }> {
   const student = await requireStudent()
   const supabase = await createClient()
+  const adminSupabase = createAdminClient()
 
-  // Verify slot is still available before booking
-  const { data: slot } = await supabase
+  // Use adminClient: students have no SELECT policy on meeting_slots
+  const { data: slot } = await adminSupabase
     .from('meeting_slots')
     .select('available')
     .eq('id', slotId)

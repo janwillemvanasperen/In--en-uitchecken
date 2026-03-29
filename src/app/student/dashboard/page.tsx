@@ -12,7 +12,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { CalendarClock } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import type { CalendarEvent } from '@/components/calendar/types'
+import type { CalendarEvent, UpcomingMeetingSlot } from '@/components/calendar/types'
 
 export default async function StudentDashboard() {
   const user = await requireStudent()
@@ -200,16 +200,47 @@ export default async function StudentDashboard() {
 
   // Upcoming calendar events (next 14 days)
   const in14Days = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000)
+  const in14DaysStr = toLocalDateStr(in14Days)
+
   const { data: upcomingEventsRaw } = await supabase
     .from('calendar_events')
     .select('*, calendar_event_labels(id, name, color)')
     .gte('event_date', todayStr)
-    .lte('event_date', toLocalDateStr(in14Days))
+    .lte('event_date', in14DaysStr)
     .order('event_date', { ascending: true })
     .order('start_time', { ascending: true, nullsFirst: false })
     .limit(5)
 
   const upcomingEvents: CalendarEvent[] = upcomingEventsRaw ?? []
+
+  // Upcoming booked meeting slots (student's own bookings in next 14 days)
+  // Step 1: get this student's booking slot IDs (student has RLS access to own bookings)
+  const { data: myBookingsRaw } = await supabase
+    .from('meeting_bookings')
+    .select('slot_id')
+    .eq('student_id', user.id)
+
+  const mySlotIds = (myBookingsRaw ?? []).map((b: any) => b.slot_id)
+
+  // Step 2: get slot details via adminClient (no student SELECT policy on meeting_slots)
+  let upcomingBookedSlots: UpcomingMeetingSlot[] = []
+  if (mySlotIds.length > 0) {
+    const { data: bookedSlotsRaw } = await adminClient
+      .from('meeting_slots')
+      .select('id, slot_date, start_time, end_time, meeting_cycles(title)')
+      .in('id', mySlotIds)
+      .gte('slot_date', todayStr)
+      .lte('slot_date', in14DaysStr)
+      .order('slot_date', { ascending: true })
+      .order('start_time', { ascending: true })
+    upcomingBookedSlots = (bookedSlotsRaw ?? []).map((s: any) => ({
+      id: s.id,
+      slot_date: s.slot_date,
+      start_time: s.start_time,
+      end_time: s.end_time,
+      cycle_title: s.meeting_cycles?.title ?? 'Gesprek',
+    }))
+  }
 
   return (
     <div className="space-y-6">
@@ -277,7 +308,7 @@ export default async function StudentDashboard() {
 
       <DevelopmentGoalsCard goalPhases={goalPhases} goalNames={finalGoalNames} />
 
-      <UpcomingEventsCard events={upcomingEvents} />
+      <UpcomingEventsCard events={upcomingEvents} bookedSlots={upcomingBookedSlots} />
     </div>
   )
 }
