@@ -54,6 +54,12 @@ const NOTIFICATIONS = {
     body: (date: string) => `Je verlofaanvraag voor ${date} is afgewezen`,
     url: "/student/leave-requests",
   },
+  meeting_cycle_available: {
+    title: "Gesprek inplannen",
+    body: (title: string) =>
+      `Je coach heeft een gespreksmomenten beschikbaar gesteld: ${title}. Plan je gesprek in via de kalender.`,
+    url: "/student/calendar",
+  },
 };
 
 // Helper: check if notification was already sent
@@ -349,6 +355,69 @@ Deno.serve(async (_req: Request) => {
             notifType,
             leave.id,
             leave.date
+          );
+        }
+      }
+    }
+
+    // --- MEETING CYCLE NOTIFICATIONS ---
+    // Notify students when a new active meeting cycle is created (within last 5 minutes)
+    const { data: newCycles } = await supabase
+      .from("meeting_cycles")
+      .select("id, title, coach_id, target_student_ids, date_from, date_until")
+      .eq("status", "active")
+      .gte("created_at", fiveMinAgo);
+
+    if (newCycles && newCycles.length > 0) {
+      for (const cycle of newCycles) {
+        // Find which students to notify
+        let studentIds: string[] = [];
+
+        if (cycle.target_student_ids && cycle.target_student_ids.length > 0) {
+          // Specific students targeted
+          studentIds = cycle.target_student_ids;
+        } else {
+          // All students of this coach
+          const { data: coachEntity } = await supabase
+            .from("coaches")
+            .select("id")
+            .eq("user_id", cycle.coach_id)
+            .single();
+
+          if (coachEntity) {
+            const { data: coachStudents } = await supabase
+              .from("users")
+              .select("id")
+              .eq("coach_id", coachEntity.id)
+              .eq("role", "student");
+            studentIds = (coachStudents ?? []).map((s: any) => s.id);
+          }
+        }
+
+        for (const studentId of studentIds) {
+          // Check if already notified for this cycle
+          const { data: alreadyLogged } = await supabase
+            .from("notification_log")
+            .select("id")
+            .eq("user_id", studentId)
+            .eq("notification_type", "meeting_cycle_available")
+            .eq("reference_id", cycle.id)
+            .limit(1);
+
+          if (alreadyLogged && alreadyLogged.length > 0) continue;
+
+          const notifConfig = NOTIFICATIONS.meeting_cycle_available;
+          await sendPushToUser(studentId, {
+            title: notifConfig.title,
+            body: notifConfig.body(cycle.title),
+            url: notifConfig.url,
+            tag: "meeting_cycle_available",
+          });
+          await logNotification(
+            studentId,
+            "meeting_cycle_available",
+            cycle.id,
+            cycle.date_from
           );
         }
       }

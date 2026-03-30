@@ -66,7 +66,9 @@ function formatDutchDate(dateStr: string): string {
 function formatTimeRange(allDay: boolean, start: string | null, end: string | null): string | null {
   if (allDay) return 'Hele dag'
   if (!start) return null
-  return end ? `${start} – ${end}` : start
+  const s = start.slice(0, 5)
+  const e = end ? end.slice(0, 5) : null
+  return e ? `${s} – ${e}` : s
 }
 
 function LabelDot({ color }: { color: string }) {
@@ -238,7 +240,7 @@ export function CoachDaySheet({
                       >
                         <div>
                           <p className="text-sm font-medium tabular-nums">
-                            {slot.start_time} – {slot.end_time}
+                            {slot.start_time.slice(0, 5)} – {slot.end_time.slice(0, 5)}
                           </p>
                           <p className="text-xs text-muted-foreground">{slot.cycle_title}</p>
                           {slot.booked_student && (
@@ -474,7 +476,7 @@ export function StudentDaySheet({
                       >
                         <div>
                           <p className="text-sm font-medium tabular-nums">
-                            {slot.start_time} – {slot.end_time}
+                            {slot.start_time.slice(0, 5)} – {slot.end_time.slice(0, 5)}
                           </p>
                           <p className="text-xs text-muted-foreground">{slot.cycle_title}</p>
                         </div>
