@@ -14,11 +14,12 @@ export default async function StudentCalendarPage() {
   // users.coach_id = coaches entity-ID; meeting_cycles.coach_id = auth user-ID van de coach
   const { data: studentProfile } = await supabase
     .from('users')
-    .select('coach_id')
+    .select('coach_id, ical_token')
     .eq('id', user.id)
     .single()
 
   const coachEntityId = studentProfile?.coach_id ?? null
+  const icalToken: string | null = studentProfile?.ical_token ?? null
 
   // Haal de auth user-ID van de EIGEN coach op via de coaches tabel
   let coachAuthUserId: string | null = null
@@ -155,6 +156,7 @@ export default async function StudentCalendarPage() {
         currentUserId={user.id}
         meetingCycles={meetingCycles}
         meetingSlots={meetingSlots}
+        icalToken={icalToken}
       />
     </div>
   )

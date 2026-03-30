@@ -6,7 +6,15 @@ import { StudentDaySheet } from './event-day-sheet'
 import { StudentEventFormDialog } from './event-form-dialog'
 import { StudentMeetingCyclePanel } from './meeting-slots-panel'
 import { Button } from '@/components/ui/button'
-import { Plus } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Plus, CalendarPlus, Copy, Check } from 'lucide-react'
 import type { CalendarEvent, MeetingCycle, MeetingSlotStudent } from './types'
 import {
   createSharedCalendarEvent,
@@ -21,6 +29,7 @@ interface StudentCalendarViewProps {
   currentUserId: string
   meetingCycles: MeetingCycle[]
   meetingSlots: MeetingSlotStudent[]
+  icalToken?: string | null
 }
 
 export function StudentCalendarView({
@@ -28,11 +37,25 @@ export function StudentCalendarView({
   currentUserId,
   meetingCycles,
   meetingSlots,
+  icalToken,
 }: StudentCalendarViewProps) {
   const today = new Date()
   const [month, setMonth] = useState(today.getMonth())
   const [year, setYear] = useState(today.getFullYear())
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  const icalUrl = icalToken
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/api/calendar/${icalToken}`
+    : null
+
+  function handleCopy() {
+    if (!icalUrl) return
+    navigator.clipboard.writeText(icalUrl).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
 
   function handleMonthChange(delta: 1 | -1) {
     setMonth((prev) => {
@@ -60,17 +83,82 @@ export function StudentCalendarView({
   return (
     <div className="space-y-4">
       {/* Top bar */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <h2 className="text-lg font-semibold">Kalender</h2>
-        <StudentEventFormDialog
-          onSubmit={createSharedCalendarEvent}
-          trigger={
-            <Button size="sm" variant="outline">
-              <Plus className="h-4 w-4 mr-1" />
-              Nieuw item
-            </Button>
-          }
-        />
+        <div className="flex items-center gap-2">
+          {icalToken && (
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline">
+                  <CalendarPlus className="h-4 w-4 mr-1" />
+                  Koppel aan privéagenda
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Koppel aan je privéagenda</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 mt-2 text-sm">
+                  <p className="text-muted-foreground">
+                    Kopieer de link hieronder en voeg hem toe aan je agenda-app.
+                    De agenda wordt automatisch bijgehouden.
+                  </p>
+
+                  {/* URL field + copy button */}
+                  <div className="flex gap-2">
+                    <Input
+                      readOnly
+                      value={icalUrl ?? ''}
+                      className="text-xs font-mono"
+                      onClick={(e) => (e.target as HTMLInputElement).select()}
+                    />
+                    <Button size="sm" variant="outline" onClick={handleCopy} className="shrink-0">
+                      {copied
+                        ? <><Check className="h-4 w-4 mr-1 text-green-600" />Gekopieerd</>
+                        : <><Copy className="h-4 w-4 mr-1" />Kopieer</>
+                      }
+                    </Button>
+                  </div>
+
+                  {/* Instructions per app */}
+                  <div className="space-y-3 border-t pt-3">
+                    <div>
+                      <p className="font-medium">Google Agenda</p>
+                      <p className="text-muted-foreground text-xs mt-0.5">
+                        Klik op het <strong>+</strong> naast "Andere agenda's" → <em>Via URL</em> → plak de link → <em>Agenda toevoegen</em>.
+                      </p>
+                    </div>
+                    <div>
+                      <p className="font-medium">Apple Agenda</p>
+                      <p className="text-muted-foreground text-xs mt-0.5">
+                        Menu <em>Bestand</em> → <em>Abonneer op agenda...</em> → plak de link → <em>Abonneer</em>.
+                      </p>
+                    </div>
+                    <div>
+                      <p className="font-medium">Outlook</p>
+                      <p className="text-muted-foreground text-xs mt-0.5">
+                        Ga naar <em>Agenda toevoegen</em> → <em>Via internet abonneren</em> → plak de link.
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground border-t pt-3">
+                    Houd deze link privé — iedereen met de link kan je agenda inzien.
+                  </p>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
+          <StudentEventFormDialog
+            onSubmit={createSharedCalendarEvent}
+            trigger={
+              <Button size="sm" variant="outline">
+                <Plus className="h-4 w-4 mr-1" />
+                Nieuw item
+              </Button>
+            }
+          />
+        </div>
       </div>
 
       {/* Legend */}
