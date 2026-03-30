@@ -24,6 +24,11 @@ import { Loader2, Plus } from 'lucide-react'
 import type { CreateMeetingCycleData } from '@/app/coach/calendar/actions'
 import type { CalendarStudent } from './types'
 
+const CYCLE_TYPES = [
+  'Reflectiegesprekken',
+  'Voortgangsgesprekken',
+]
+
 const DAYS = [
   { value: 1, label: 'Ma' },
   { value: 2, label: 'Di' },
@@ -46,7 +51,7 @@ export function MeetingCycleFormDialog({ students, onSubmit }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  const [title, setTitle] = useState('')
+  const [title, setTitle] = useState(CYCLE_TYPES[0])
   const [description, setDescription] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateUntil, setDateUntil] = useState('')
@@ -58,7 +63,7 @@ export function MeetingCycleFormDialog({ students, onSubmit }: Props) {
   const [targetStudentIds, setTargetStudentIds] = useState<string[]>([])
 
   function resetForm() {
-    setTitle('')
+    setTitle(CYCLE_TYPES[0])
     setDescription('')
     setDateFrom('')
     setDateUntil('')
@@ -85,7 +90,6 @@ export function MeetingCycleFormDialog({ students, onSubmit }: Props) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!title.trim()) { setError('Titel is verplicht'); return }
     if (!dateFrom) { setError('Startdatum is verplicht'); return }
     if (!dateUntil) { setError('Einddatum is verplicht'); return }
     if (dateUntil < dateFrom) { setError('Einddatum moet na startdatum liggen'); return }
@@ -131,14 +135,17 @@ export function MeetingCycleFormDialog({ students, onSubmit }: Props) {
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
           <div className="space-y-1.5">
-            <Label htmlFor="mc-title">Titel *</Label>
-            <Input
-              id="mc-title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Bijv. Voortgangsgesprekken periode 3"
-              required
-            />
+            <Label>Type gesprek *</Label>
+            <Select value={title} onValueChange={setTitle}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CYCLE_TYPES.map((t) => (
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-1.5">
