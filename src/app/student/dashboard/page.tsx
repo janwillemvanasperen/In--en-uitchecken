@@ -136,19 +136,32 @@ export default async function StudentDashboard() {
   const coachEntityId = studentProfile?.coach_id ?? null
 
   let activeCyclesForStudent: { id: string; title: string }[] = []
+  let coachAuthUserIdForDashboard: string | null = null
   if (coachEntityId) {
     const { data: coachRecord } = await adminClient
       .from('coaches').select('user_id').eq('id', coachEntityId).single()
-    const coachAuthUserId = coachRecord?.user_id ?? null
-    if (coachAuthUserId) {
-      const { data: cyclesData } = await adminClient
-        .from('meeting_cycles')
-        .select('id, title')
-        .eq('coach_id', coachAuthUserId)
-        .eq('status', 'active')
-        .or(`target_student_ids.is.null,target_student_ids.cs.{${user.id}}`)
-      activeCyclesForStudent = cyclesData ?? []
-    }
+    coachAuthUserIdForDashboard = coachRecord?.user_id ?? null
+  }
+
+  if (coachAuthUserIdForDashboard) {
+    // Own coach cycles (all-student or explicitly targeted) + other coaches that explicitly target this student
+    const { data: cyclesData } = await adminClient
+      .from('meeting_cycles')
+      .select('id, title')
+      .eq('status', 'active')
+      .or(
+        `and(coach_id.eq.${coachAuthUserIdForDashboard},target_student_ids.is.null),` +
+        `target_student_ids.cs.{${user.id}}`
+      )
+    activeCyclesForStudent = cyclesData ?? []
+  } else {
+    // No own coach — show only cycles explicitly targeting this student
+    const { data: cyclesData } = await adminClient
+      .from('meeting_cycles')
+      .select('id, title')
+      .eq('status', 'active')
+      .filter('target_student_ids', 'cs', `{${user.id}}`)
+    activeCyclesForStudent = cyclesData ?? []
   }
 
   // Development goals (use admin client to bypass RLS)

@@ -222,6 +222,7 @@ export function StudentMeetingCyclePanel({
           <div className="min-w-0">
             <p className="font-medium text-sm truncate">{cycle.title}</p>
             <p className="text-xs text-muted-foreground">
+              {cycle.coach_name && <span className="font-medium">{cycle.coach_name} · </span>}
               {formatShortDate(cycle.date_from)} – {formatShortDate(cycle.date_until)}
               {myCount > 0 && ` · ${myCount} geboekt`}
             </p>

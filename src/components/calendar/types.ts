@@ -53,6 +53,8 @@ export interface MeetingCycle {
   status: 'active' | 'closed'
   target_student_ids: string[] | null  // null = all students; array = specific
   created_at: string
+  // Enriched on student-facing pages (not stored in DB)
+  coach_name?: string
 }
 
 /** Slot as seen by a coach (includes who booked it) */
