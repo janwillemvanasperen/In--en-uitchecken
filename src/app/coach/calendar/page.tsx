@@ -59,10 +59,7 @@ export default async function CoachCalendarPage() {
         end_time,
         available,
         meeting_cycles!inner(title, coach_id),
-        meeting_bookings(
-          student_id,
-          users:student_id(id, full_name)
-        )
+        meeting_bookings(student_id)
       `)
       .eq('meeting_cycles.coach_id', user.id)
       .order('slot_date', { ascending: true })
@@ -73,6 +70,18 @@ export default async function CoachCalendarPage() {
   const labels: CalendarLabel[] = labelsRaw ?? []
   const students: CalendarStudent[] = studentsRaw ?? []
   const meetingCycles: MeetingCycle[] = cyclesRaw ?? []
+
+  // meeting_bookings.student_id → auth.users, not public.users
+  // PostgREST can't auto-join to public.users through auth.users, so look up names separately
+  const bookedStudentIds = [...new Set(
+    (slotsRaw ?? []).flatMap((s: any) => s.meeting_bookings?.map((b: any) => b.student_id) ?? [])
+  )]
+  const { data: studentNamesRaw } = bookedStudentIds.length > 0
+    ? await adminSupabase.from('users').select('id, full_name').in('id', bookedStudentIds)
+    : { data: [] }
+  const studentNameMap: Record<string, string> = Object.fromEntries(
+    (studentNamesRaw ?? []).map((u: any) => [u.id, u.full_name])
+  )
 
   const meetingSlots: MeetingSlotCoach[] = (slotsRaw ?? []).map((s: any) => {
     const booking = s.meeting_bookings?.[0] ?? null
@@ -85,8 +94,8 @@ export default async function CoachCalendarPage() {
       end_time: s.end_time,
       available: s.available,
       notes: s.notes ?? null,
-      booked_student: booking?.users
-        ? { id: booking.users.id, full_name: booking.users.full_name }
+      booked_student: booking?.student_id
+        ? { id: booking.student_id, full_name: studentNameMap[booking.student_id] ?? 'Onbekend' }
         : null,
     }
   })

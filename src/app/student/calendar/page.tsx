@@ -32,18 +32,50 @@ export default async function StudentCalendarPage() {
     coachAuthUserId = coachRecord?.user_id ?? null
   }
 
+  // Fetch events via two explicit queries (bypasses broken RLS; works with or without migration)
+  const [ownEventsResult, coachEventsResult] = await Promise.all([
+    // 1. Student's own shared events
+    adminSupabase
+      .from('calendar_events')
+      .select('*, calendar_event_labels(id, name, color)')
+      .eq('variant', 'shared')
+      .eq('student_id', user.id)
+      .order('event_date', { ascending: true })
+      .order('start_time', { ascending: true, nullsFirst: false }),
+
+    // 2. Coach events created by this student's coach
+    coachAuthUserId
+      ? adminSupabase
+          .from('calendar_events')
+          .select('*, calendar_event_labels(id, name, color)')
+          .eq('variant', 'coach')
+          .eq('created_by', coachAuthUserId)
+          .order('event_date', { ascending: true })
+          .order('start_time', { ascending: true, nullsFirst: false })
+      : Promise.resolve({ data: [] }),
+  ])
+
+  // Filter coach events by targeting:
+  // - target_student_ids IS NULL → all students of this coach
+  // - target_student_ids contains this student's id → specific targeting
+  const coachEvents = (coachEventsResult.data ?? []).filter((e: any) => {
+    const targets = e.target_student_ids
+    return targets === null || targets === undefined || targets.includes(user.id)
+  })
+
+  const eventsRaw = [
+    ...(ownEventsResult.data ?? []),
+    ...coachEvents,
+  ].sort((a: any, b: any) =>
+    a.event_date.localeCompare(b.event_date) ||
+    (a.start_time ?? '').localeCompare(b.start_time ?? '')
+  )
+
   const [
-    { data: eventsRaw },
     { data: cyclesRaw },
     { data: slotsRaw },
     { data: bookingsRaw },
   ] = await Promise.all([
-    // RLS ensures we only get events relevant to this student
-    supabase
-      .from('calendar_events')
-      .select('*, calendar_event_labels(id, name, color)')
-      .order('event_date', { ascending: true })
-      .order('start_time', { ascending: true, nullsFirst: false }),
 
     // Meeting cycles from the student's coach that target this student
     // (target_student_ids IS NULL = all students, or contains this student's id)

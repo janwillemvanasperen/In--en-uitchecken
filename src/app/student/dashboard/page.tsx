@@ -9,7 +9,7 @@ import { UpcomingEventsCard } from '@/components/student/upcoming-events-card'
 import { getMonday, toLocalDateStr } from '@/lib/date-utils'
 import type { DayData } from '@/components/student/week-history-view'
 import { createAdminClient } from '@/lib/supabase/server'
-import { CalendarClock } from 'lucide-react'
+import { CalendarClock, MessageSquare } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import type { CalendarEvent, UpcomingMeetingSlot } from '@/components/calendar/types'
@@ -129,8 +129,29 @@ export default async function StudentDashboard() {
     .from('locations')
     .select('*')
 
-  // Development goals (use admin client to bypass RLS)
+  // Coach lookup: find which meeting cycles are available for this student
   const adminClient = createAdminClient()
+  const { data: studentProfile } = await supabase
+    .from('users').select('coach_id').eq('id', user.id).single()
+  const coachEntityId = studentProfile?.coach_id ?? null
+
+  let activeCyclesForStudent: { id: string; title: string }[] = []
+  if (coachEntityId) {
+    const { data: coachRecord } = await adminClient
+      .from('coaches').select('user_id').eq('id', coachEntityId).single()
+    const coachAuthUserId = coachRecord?.user_id ?? null
+    if (coachAuthUserId) {
+      const { data: cyclesData } = await adminClient
+        .from('meeting_cycles')
+        .select('id, title')
+        .eq('coach_id', coachAuthUserId)
+        .eq('status', 'active')
+        .or(`target_student_ids.is.null,target_student_ids.cs.{${user.id}}`)
+      activeCyclesForStudent = cyclesData ?? []
+    }
+  }
+
+  // Development goals (use admin client to bypass RLS)
   const [{ data: devGoals }, { data: goalNames }] = await Promise.all([
     adminClient
       .from('student_development_goals')
@@ -224,23 +245,28 @@ export default async function StudentDashboard() {
 
   // Step 2: get slot details via adminClient (no student SELECT policy on meeting_slots)
   let upcomingBookedSlots: UpcomingMeetingSlot[] = []
+  const bookedCycleIds = new Set<string>()
   if (mySlotIds.length > 0) {
     const { data: bookedSlotsRaw } = await adminClient
       .from('meeting_slots')
-      .select('id, slot_date, start_time, end_time, meeting_cycles(title)')
+      .select('id, cycle_id, slot_date, start_time, end_time, meeting_cycles(title)')
       .in('id', mySlotIds)
-      .gte('slot_date', todayStr)
-      .lte('slot_date', in14DaysStr)
       .order('slot_date', { ascending: true })
       .order('start_time', { ascending: true })
-    upcomingBookedSlots = (bookedSlotsRaw ?? []).map((s: any) => ({
-      id: s.id,
-      slot_date: s.slot_date,
-      start_time: s.start_time,
-      end_time: s.end_time,
-      cycle_title: s.meeting_cycles?.title ?? 'Gesprek',
-    }))
+    ;(bookedSlotsRaw ?? []).forEach((s: any) => bookedCycleIds.add(s.cycle_id))
+    upcomingBookedSlots = (bookedSlotsRaw ?? [])
+      .filter((s: any) => s.slot_date >= todayStr && s.slot_date <= in14DaysStr)
+      .map((s: any) => ({
+        id: s.id,
+        slot_date: s.slot_date,
+        start_time: s.start_time.slice(0, 5),
+        end_time: s.end_time.slice(0, 5),
+        cycle_title: s.meeting_cycles?.title ?? 'Gesprek',
+      }))
   }
+
+  // Cycles this student can book but hasn't yet
+  const unbookedCycles = activeCyclesForStudent.filter(c => !bookedCycleIds.has(c.id))
 
   return (
     <div className="space-y-6">
@@ -267,6 +293,28 @@ export default async function StudentDashboard() {
           <Link href="/student/schedule?tab=indienen">
             <Button size="sm" className="shrink-0 bg-[#ffd100] text-black hover:bg-[#e6bc00]">
               Rooster invullen
+            </Button>
+          </Link>
+        </div>
+      )}
+
+      {/* Available meeting cycles banner */}
+      {unbookedCycles.length > 0 && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-4 flex items-start gap-3">
+          <MessageSquare className="h-5 w-5 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+              {unbookedCycles.length === 1
+                ? `Gesprekscyclus beschikbaar: ${unbookedCycles[0].title}`
+                : `${unbookedCycles.length} gesprekscycli beschikbaar om in te schrijven`}
+            </p>
+            <p className="text-sm mt-0.5 text-muted-foreground">
+              Schrijf je in voor een gesprek met je coach
+            </p>
+          </div>
+          <Link href="/student/calendar">
+            <Button size="sm" className="shrink-0 bg-amber-400 text-black hover:bg-amber-500">
+              Inschrijven
             </Button>
           </Link>
         </div>

@@ -128,7 +128,7 @@ export function CoachMeetingCyclePanel({
                     >
                       <div className="flex items-center gap-2">
                         <span className="tabular-nums text-xs">
-                          {slot.start_time} – {slot.end_time}
+                          {slot.start_time.slice(0, 5)} – {slot.end_time.slice(0, 5)}
                         </span>
                         {slot.booked_student ? (
                           <span className="text-xs font-medium text-green-700 dark:text-green-400">
@@ -258,7 +258,7 @@ export function StudentMeetingCyclePanel({
                         className="flex items-center justify-between rounded px-2 py-1 text-sm"
                       >
                         <span className="tabular-nums text-xs">
-                          {slot.start_time} – {slot.end_time}
+                          {slot.start_time.slice(0, 5)} – {slot.end_time.slice(0, 5)}
                         </span>
                         <div className="flex items-center gap-2">
                           {slot.isMyBooking ? (
