@@ -125,7 +125,7 @@ export function StudentCalendarView({
                     <div>
                       <p className="font-medium">Google Agenda</p>
                       <p className="text-muted-foreground text-xs mt-0.5">
-                        Klik op het <strong>+</strong> naast "Andere agenda's" → <em>Via URL</em> → plak de link → <em>Agenda toevoegen</em>.
+                        Klik op het <strong>+</strong> naast &quot;Andere agenda&apos;s&quot; → <em>Via URL</em> → plak de link → <em>Agenda toevoegen</em>.
                       </p>
                     </div>
                     <div>
