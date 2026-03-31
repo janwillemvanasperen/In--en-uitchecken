@@ -2,7 +2,7 @@
 import { requireStudent } from '@/lib/auth'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { StudentCalendarView } from '@/components/calendar/student-calendar-view'
-import type { CalendarEvent, MeetingCycle, MeetingSlotStudent } from '@/components/calendar/types'
+import type { CalendarEvent, MeetingCycle, MeetingSlotStudent, Activity } from '@/components/calendar/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -149,6 +149,29 @@ export default async function StudentCalendarPage() {
     isMyBooking: myBookedSlotIds.has(s.id),
   }))
 
+  // ─── Activities ─────────────────────────────────────────────────────────────
+  // Fetch activities this student is signed up for
+  const { data: myActivitySignups } = await supabase
+    .from('activity_signups')
+    .select('activity_id')
+
+  const myActivityIds = (myActivitySignups ?? []).map((s: any) => s.activity_id)
+  let signedUpActivities: Activity[] = []
+
+  if (myActivityIds.length > 0) {
+    const { data: activitiesRaw } = await adminSupabase
+      .from('activities')
+      .select('*')
+      .in('id', myActivityIds)
+      .eq('status', 'active')
+      .order('activity_date', { ascending: true })
+
+    signedUpActivities = (activitiesRaw ?? []).map((a: any) => ({
+      ...a,
+      is_signed_up: true,
+    }))
+  }
+
   return (
     <div className="p-4 md:p-6 max-w-2xl mx-auto">
       <StudentCalendarView
@@ -156,6 +179,7 @@ export default async function StudentCalendarPage() {
         currentUserId={user.id}
         meetingCycles={meetingCycles}
         meetingSlots={meetingSlots}
+        activities={signedUpActivities}
         icalToken={icalToken}
       />
     </div>

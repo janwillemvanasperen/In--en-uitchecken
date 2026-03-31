@@ -7,6 +7,7 @@ import type { CalendarEvent } from './types'
 interface CalendarGridProps {
   events: CalendarEvent[]
   meetingSlotDates?: string[]
+  activityDates?: string[]
   month: number   // 0-indexed (0 = January)
   year: number
   onDayClick: (dateStr: string) => void
@@ -34,7 +35,7 @@ function mondayDow(jsDay: number): number {
   return (jsDay + 6) % 7
 }
 
-export function CalendarGrid({ events, meetingSlotDates, month, year, onDayClick, onMonthChange }: CalendarGridProps) {
+export function CalendarGrid({ events, meetingSlotDates, activityDates, month, year, onDayClick, onMonthChange }: CalendarGridProps) {
   const today = todayYMD()
 
   // Build a map: dateStr → events[]
@@ -46,6 +47,7 @@ export function CalendarGrid({ events, meetingSlotDates, month, year, onDayClick
   }
 
   const meetingDateSet = new Set(meetingSlotDates ?? [])
+  const activityDateSet = new Set(activityDates ?? [])
 
   // First day of the month
   const firstDay = new Date(year, month, 1)
@@ -106,6 +108,7 @@ export function CalendarGrid({ events, meetingSlotDates, month, year, onDayClick
           const dateStr = toYMD(year, month, day)
           const dayEvents = eventsByDate.get(dateStr) ?? []
           const hasMeetingSlots = meetingDateSet.has(dateStr)
+          const hasActivities = activityDateSet.has(dateStr)
           const isToday = dateStr === today
           const isPast = dateStr < today
 
@@ -137,6 +140,12 @@ export function CalendarGrid({ events, meetingSlotDates, month, year, onDayClick
                   <span
                     className="inline-block h-1.5 w-1.5 rounded-full shrink-0 bg-amber-400"
                     title="Gesprekken beschikbaar"
+                  />
+                )}
+                {hasActivities && (
+                  <span
+                    className="inline-block h-1.5 w-1.5 rounded-full shrink-0 bg-emerald-500"
+                    title="Activiteit"
                   />
                 )}
                 {dayEvents.slice(0, hasMeetingSlots ? 2 : 3).map((ev) => {

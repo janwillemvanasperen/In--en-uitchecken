@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Plus, CalendarPlus, Copy, Check } from 'lucide-react'
-import type { CalendarEvent, MeetingCycle, MeetingSlotStudent } from './types'
+import type { CalendarEvent, MeetingCycle, MeetingSlotStudent, Activity } from './types'
 import {
   createSharedCalendarEvent,
   updateSharedCalendarEvent,
@@ -29,6 +29,7 @@ interface StudentCalendarViewProps {
   currentUserId: string
   meetingCycles: MeetingCycle[]
   meetingSlots: MeetingSlotStudent[]
+  activities?: Activity[]
   icalToken?: string | null
 }
 
@@ -37,6 +38,7 @@ export function StudentCalendarView({
   currentUserId,
   meetingCycles,
   meetingSlots,
+  activities,
   icalToken,
 }: StudentCalendarViewProps) {
   const today = new Date()
@@ -69,6 +71,9 @@ export function StudentCalendarView({
   // Unique dates with meeting slots for amber dots
   const meetingSlotDates = [...new Set(meetingSlots.map((s) => s.slot_date))]
 
+  // Unique dates for signed-up activities (green dots)
+  const activityDates = [...new Set((activities ?? []).map((a) => a.activity_date))]
+
   // Group slots by cycle
   const slotsByCycle = new Map<string, MeetingSlotStudent[]>()
   for (const slot of meetingSlots) {
@@ -78,6 +83,10 @@ export function StudentCalendarView({
 
   const selectedDaySlots = selectedDate
     ? meetingSlots.filter((s) => s.slot_date === selectedDate)
+    : []
+
+  const selectedDayActivities = selectedDate
+    ? (activities ?? []).filter((a) => a.activity_date === selectedDate)
     : []
 
   return (
@@ -177,12 +186,19 @@ export function StudentCalendarView({
             Gesprekken
           </span>
         )}
+        {(activities ?? []).length > 0 && (
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
+            Activiteiten
+          </span>
+        )}
       </div>
 
       {/* Calendar grid */}
       <CalendarGrid
         events={events}
         meetingSlotDates={meetingSlotDates}
+        activityDates={activityDates}
         month={month}
         year={year}
         onDayClick={setSelectedDate}
@@ -196,6 +212,7 @@ export function StudentCalendarView({
         currentUserId={currentUserId}
         meetingSlots={selectedDaySlots}
         meetingCycles={meetingCycles}
+        activities={selectedDayActivities}
         onClose={() => setSelectedDate(null)}
         onCreateEvent={createSharedCalendarEvent}
         onUpdateEvent={updateSharedCalendarEvent}

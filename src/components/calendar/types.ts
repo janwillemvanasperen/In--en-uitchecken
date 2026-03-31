@@ -90,3 +90,32 @@ export interface MeetingSlotStudent {
   isBooked: boolean      // someone (not necessarily this student) has booked
   isMyBooking: boolean   // this student has booked this slot
 }
+
+// ─── Activities ────────────────────────────────────────────────────────────────
+
+export interface Activity {
+  id: string
+  title: string
+  description: string | null
+  activity_date: string        // YYYY-MM-DD
+  start_time: string | null    // HH:mm
+  end_time: string | null      // HH:mm
+  location: string | null
+  max_participants: number | null
+  signup_deadline: string | null  // ISO datetime
+  created_by: string
+  status: 'active' | 'cancelled'
+  created_at: string
+  // Enriched
+  signup_count?: number
+  is_signed_up?: boolean
+}
+
+/** Signup record enriched with student name (coach view) */
+export interface ActivitySignup {
+  id: string
+  activity_id: string
+  student_id: string
+  full_name: string
+  signed_up_at: string
+}

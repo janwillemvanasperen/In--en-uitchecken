@@ -34,7 +34,7 @@ function nowUtc(): string {
   return new Date().toISOString().replace(/[-:.]/g, '').slice(0, 15) + 'Z'
 }
 
-function generateIcs(userName: string, events: any[], slots: any[]): string {
+function generateIcs(userName: string, events: any[], slots: any[], activities: any[] = []): string {
   const stamp = nowUtc()
   const lines: string[] = [
     'BEGIN:VCALENDAR',
@@ -110,6 +110,40 @@ function generateIcs(userName: string, events: any[], slots: any[]): string {
       `DTEND;TZID=Europe/Amsterdam:${toIcsDateTime(slot.slot_date, slot.end_time)}`
     )
     lines.push(`SUMMARY:${escapeIcs(title)}`)
+    lines.push('END:VEVENT')
+  }
+
+  for (const activity of activities) {
+    lines.push('BEGIN:VEVENT')
+    lines.push(`UID:activity-${activity.id}@in-en-uitchecken`)
+    lines.push(`DTSTAMP:${stamp}`)
+    if (activity.start_time) {
+      lines.push(
+        `DTSTART;TZID=Europe/Amsterdam:${toIcsDateTime(activity.activity_date, activity.start_time)}`
+      )
+      if (activity.end_time) {
+        lines.push(
+          `DTEND;TZID=Europe/Amsterdam:${toIcsDateTime(activity.activity_date, activity.end_time)}`
+        )
+      } else {
+        const [h, m] = activity.start_time.split(':').map(Number)
+        const endH = String(Math.min(h + 1, 23)).padStart(2, '0')
+        const endM = String(m).padStart(2, '0')
+        lines.push(
+          `DTEND;TZID=Europe/Amsterdam:${toIcsDateTime(activity.activity_date, `${endH}:${endM}`)}`
+        )
+      }
+    } else {
+      lines.push(`DTSTART;VALUE=DATE:${toIcsDate(activity.activity_date)}`)
+      lines.push(`DTEND;VALUE=DATE:${toIcsDate(nextDayStr(activity.activity_date))}`)
+    }
+    lines.push(`SUMMARY:${escapeIcs(activity.title)}`)
+    if (activity.description) {
+      lines.push(`DESCRIPTION:${escapeIcs(activity.description)}`)
+    }
+    if (activity.location) {
+      lines.push(`LOCATION:${escapeIcs(activity.location)}`)
+    }
     lines.push('END:VEVENT')
   }
 
@@ -194,7 +228,25 @@ export async function GET(
     bookedSlots = data ?? []
   }
 
-  const icsContent = generateIcs(userRecord.full_name, events, bookedSlots)
+  // Fetch signed-up activities
+  const { data: myActivitySignups } = await adminSupabase
+    .from('activity_signups')
+    .select('activity_id')
+    .eq('student_id', userId)
+
+  const myActivityIds = (myActivitySignups ?? []).map((s: any) => s.activity_id)
+  let signedUpActivities: any[] = []
+  if (myActivityIds.length > 0) {
+    const { data } = await adminSupabase
+      .from('activities')
+      .select('id, title, description, activity_date, start_time, end_time, location')
+      .in('id', myActivityIds)
+      .eq('status', 'active')
+      .order('activity_date', { ascending: true })
+    signedUpActivities = data ?? []
+  }
+
+  const icsContent = generateIcs(userRecord.full_name, events, bookedSlots, signedUpActivities)
 
   return new Response(icsContent, {
     headers: {
