@@ -155,15 +155,16 @@ function generateIcs(userName: string, events: any[], slots: any[], activities: 
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { token: string } }
+  { params }: { params: Promise<{ token: string }> }
 ) {
+  const { token } = await params
   const adminSupabase = createAdminClient()
 
   // Look up user by iCal token
   const { data: userRecord } = await adminSupabase
     .from('users')
     .select('id, full_name, coach_id')
-    .eq('ical_token', params.token)
+    .eq('ical_token', token)
     .single()
 
   if (!userRecord) {
