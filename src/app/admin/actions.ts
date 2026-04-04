@@ -3,6 +3,14 @@
 
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { requireAdmin, requireAdminOrVerzuim } from '@/lib/auth'
+
+function validatePassword(password: string): string | null {
+  if (!password || password.length < 8) return 'Wachtwoord moet minstens 8 tekens zijn'
+  if (password.length > 128) return 'Wachtwoord mag maximaal 128 tekens zijn'
+  if (!/[A-Za-z]/.test(password)) return 'Wachtwoord moet minimaal één letter bevatten'
+  if (!/[0-9]/.test(password)) return 'Wachtwoord moet minimaal één cijfer bevatten'
+  return null
+}
 import { revalidatePath } from 'next/cache'
 import type { CreateUserInput, UpdateUserInput, CreateLocationInput, UpdateLocationInput } from '@/types'
 
@@ -11,6 +19,10 @@ import type { CreateUserInput, UpdateUserInput, CreateLocationInput, UpdateLocat
 export async function createUser(data: CreateUserInput) {
   try {
     await requireAdmin()
+
+    const passwordError = validatePassword(data.password)
+    if (passwordError) return { error: passwordError }
+
     const adminClient = createAdminClient()
 
     // Create auth user with metadata - the handle_new_user trigger
@@ -39,7 +51,8 @@ export async function createUser(data: CreateUserInput) {
     }
 
     if (authError) {
-      return { error: `Account aanmaken mislukt: ${authError.message}` }
+      console.error('createUser auth error:', authError.message)
+      return { error: 'Account aanmaken mislukt. Controleer of het e-mailadres nog niet in gebruik is.' }
     }
 
     revalidatePath('/admin/users')
@@ -72,7 +85,8 @@ export async function updateUser(userId: string, data: UpdateUserInput) {
       .eq('id', userId)
 
     if (error) {
-      return { error: `Gebruiker bijwerken mislukt: ${error.message}` }
+      console.error('updateUser error:', error.message)
+      return { error: 'Gebruiker bijwerken mislukt. Probeer het opnieuw.' }
     }
 
     // Update email in auth if changed
@@ -100,7 +114,8 @@ export async function deleteUser(userId: string) {
       .eq('id', userId)
 
     if (deleteError) {
-      return { error: `Gebruiker verwijderen mislukt: ${deleteError.message}` }
+      console.error('deleteUser error:', deleteError.message)
+      return { error: 'Gebruiker verwijderen mislukt. Probeer het opnieuw.' }
     }
 
     // Delete auth user
