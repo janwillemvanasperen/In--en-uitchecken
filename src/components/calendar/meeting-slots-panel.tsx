@@ -128,7 +128,7 @@ export function CoachMeetingCyclePanel({
                     >
                       <div className="flex items-center gap-2">
                         <span className="tabular-nums text-xs">
-                          {slot.start_time} – {slot.end_time}
+                          {slot.start_time.slice(0, 5)} – {slot.end_time.slice(0, 5)}
                         </span>
                         {slot.booked_student ? (
                           <span className="text-xs font-medium text-green-700 dark:text-green-400">
@@ -222,6 +222,7 @@ export function StudentMeetingCyclePanel({
           <div className="min-w-0">
             <p className="font-medium text-sm truncate">{cycle.title}</p>
             <p className="text-xs text-muted-foreground">
+              {cycle.coach_name && <span className="font-medium">{cycle.coach_name} · </span>}
               {formatShortDate(cycle.date_from)} – {formatShortDate(cycle.date_until)}
               {myCount > 0 && ` · ${myCount} geboekt`}
             </p>
@@ -258,7 +259,7 @@ export function StudentMeetingCyclePanel({
                         className="flex items-center justify-between rounded px-2 py-1 text-sm"
                       >
                         <span className="tabular-nums text-xs">
-                          {slot.start_time} – {slot.end_time}
+                          {slot.start_time.slice(0, 5)} – {slot.end_time.slice(0, 5)}
                         </span>
                         <div className="flex items-center gap-2">
                           {slot.isMyBooking ? (

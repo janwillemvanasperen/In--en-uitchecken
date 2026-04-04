@@ -22,6 +22,12 @@ import {
 } from '@/components/ui/select'
 import { Loader2, Plus } from 'lucide-react'
 import type { CreateMeetingCycleData } from '@/app/coach/calendar/actions'
+import type { CalendarStudent } from './types'
+
+const CYCLE_TYPES = [
+  'Reflectiegesprekken',
+  'Voortgangsgesprekken',
+]
 
 const DAYS = [
   { value: 1, label: 'Ma' },
@@ -36,33 +42,44 @@ const DAYS = [
 const DURATIONS = [15, 20, 30, 45, 60, 90]
 
 interface Props {
+  students: CalendarStudent[]
   onSubmit: (data: CreateMeetingCycleData) => Promise<{ error?: string }>
 }
 
-export function MeetingCycleFormDialog({ onSubmit }: Props) {
+export function MeetingCycleFormDialog({ students, onSubmit }: Props) {
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  const [title, setTitle] = useState('')
+  const [title, setTitle] = useState(CYCLE_TYPES[0])
   const [description, setDescription] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateUntil, setDateUntil] = useState('')
   const [daysOfWeek, setDaysOfWeek] = useState<number[]>([1, 2, 3, 4, 5])
-  const [dayStartTime, setDayStartTime] = useState('09:00')
-  const [dayEndTime, setDayEndTime] = useState('17:00')
+  const [dayStartTime, setDayStartTime] = useState('10:30')
+  const [dayEndTime, setDayEndTime] = useState('15:00')
   const [slotDuration, setSlotDuration] = useState(30)
+  const [targetAll, setTargetAll] = useState(true)
+  const [targetStudentIds, setTargetStudentIds] = useState<string[]>([])
 
   function resetForm() {
-    setTitle('')
+    setTitle(CYCLE_TYPES[0])
     setDescription('')
     setDateFrom('')
     setDateUntil('')
     setDaysOfWeek([1, 2, 3, 4, 5])
-    setDayStartTime('09:00')
-    setDayEndTime('17:00')
+    setDayStartTime('10:30')
+    setDayEndTime('15:00')
     setSlotDuration(30)
+    setTargetAll(true)
+    setTargetStudentIds([])
     setError(null)
+  }
+
+  function toggleTargetStudent(id: string) {
+    setTargetStudentIds((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
+    )
   }
 
   function toggleDay(day: number) {
@@ -73,12 +90,14 @@ export function MeetingCycleFormDialog({ onSubmit }: Props) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!title.trim()) { setError('Titel is verplicht'); return }
     if (!dateFrom) { setError('Startdatum is verplicht'); return }
     if (!dateUntil) { setError('Einddatum is verplicht'); return }
     if (dateUntil < dateFrom) { setError('Einddatum moet na startdatum liggen'); return }
     if (daysOfWeek.length === 0) { setError('Selecteer minimaal één dag'); return }
     if (dayEndTime <= dayStartTime) { setError('Eindtijd moet na begintijd liggen'); return }
+    if (!targetAll && targetStudentIds.length === 0) {
+      setError('Selecteer minimaal één student of kies "Alle studenten"'); return
+    }
     setError(null)
 
     startTransition(async () => {
@@ -91,6 +110,7 @@ export function MeetingCycleFormDialog({ onSubmit }: Props) {
         day_start_time: dayStartTime,
         day_end_time: dayEndTime,
         slot_duration: slotDuration,
+        target_student_ids: targetAll ? null : targetStudentIds,
       })
       if (result.error) {
         setError(result.error)
@@ -115,14 +135,17 @@ export function MeetingCycleFormDialog({ onSubmit }: Props) {
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
           <div className="space-y-1.5">
-            <Label htmlFor="mc-title">Titel *</Label>
-            <Input
-              id="mc-title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Bijv. Voortgangsgesprekken periode 3"
-              required
-            />
+            <Label>Type gesprek *</Label>
+            <Select value={title} onValueChange={setTitle}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CYCLE_TYPES.map((t) => (
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-1.5">
@@ -213,6 +236,34 @@ export function MeetingCycleFormDialog({ onSubmit }: Props) {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Student targeting */}
+          <div className="space-y-2">
+            <Label>Voor wie</Label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <Checkbox
+                checked={targetAll}
+                onCheckedChange={(v) => { setTargetAll(!!v); if (v) setTargetStudentIds([]) }}
+              />
+              <span className="text-sm font-medium">Alle studenten</span>
+            </label>
+            {!targetAll && (
+              <div className="pl-6 space-y-1.5 max-h-36 overflow-y-auto border rounded-md p-2">
+                {students.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Geen studenten gevonden</p>
+                )}
+                {students.map((s) => (
+                  <label key={s.id} className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={targetStudentIds.includes(s.id)}
+                      onCheckedChange={() => toggleTargetStudent(s.id)}
+                    />
+                    <span className="text-sm">{s.full_name}</span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}

@@ -1,8 +1,8 @@
 import Link from 'next/link'
-import { CalendarDays, Lock, ArrowRight } from 'lucide-react'
+import { CalendarDays, Lock, ArrowRight, MessageSquare } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import type { CalendarEvent } from '@/components/calendar/types'
+import type { CalendarEvent, UpcomingMeetingSlot } from '@/components/calendar/types'
 import { ACTION_TYPE_DEFAULTS } from '@/components/calendar/types'
 
 const DUTCH_DAY_NAMES = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za']
@@ -28,9 +28,10 @@ function LabelDot({ color }: { color: string }) {
 
 interface UpcomingEventsCardProps {
   events: CalendarEvent[]
+  bookedSlots?: UpcomingMeetingSlot[]
 }
 
-export function UpcomingEventsCard({ events }: UpcomingEventsCardProps) {
+export function UpcomingEventsCard({ events, bookedSlots = [] }: UpcomingEventsCardProps) {
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -40,10 +41,38 @@ export function UpcomingEventsCard({ events }: UpcomingEventsCardProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {events.length === 0 ? (
+        {events.length === 0 && bookedSlots.length === 0 ? (
           <p className="text-sm text-muted-foreground">Geen aankomende items</p>
-        ) : (
-          events.map((ev) => {
+        ) : null}
+
+        {/* Booked meeting slots */}
+        {bookedSlots.map((slot) => (
+          <div key={slot.id} className="flex gap-3 py-2 border-b last:border-0">
+            <div className="shrink-0 w-14 text-center">
+              <p className="text-[10px] text-muted-foreground uppercase leading-tight">
+                {formatShortDate(slot.slot_date).split(' ').slice(0, 1).join('')}
+              </p>
+              <p className="text-lg font-bold leading-tight">
+                {slot.slot_date.split('-')[2].replace(/^0/, '')}
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                {formatShortDate(slot.slot_date).split(' ').slice(2).join(' ')}
+              </p>
+            </div>
+            <div className="flex-1 min-w-0 space-y-1">
+              <div className="flex items-start gap-1.5">
+                <MessageSquare className="h-3 w-3 text-amber-500 shrink-0 mt-1" />
+                <p className="font-medium text-sm leading-tight">{slot.cycle_title}</p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {slot.start_time.slice(0, 5)}–{slot.end_time.slice(0, 5)} · Geboekt gesprek
+              </p>
+            </div>
+          </div>
+        ))}
+
+        {/* Calendar events */}
+        {events.map((ev) => {
             const isCoachEvent = ev.variant === 'coach'
             const labelColor = ev.calendar_event_labels?.color
             const actionInfo = ev.action_type ? ACTION_TYPE_DEFAULTS[ev.action_type] : null
@@ -101,8 +130,7 @@ export function UpcomingEventsCard({ events }: UpcomingEventsCardProps) {
                 </div>
               </div>
             )
-          })
-        )}
+          })}
 
         {/* Link to full calendar */}
         <Link

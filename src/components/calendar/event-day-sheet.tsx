@@ -15,6 +15,7 @@ import type {
   MeetingCycle,
   MeetingSlotCoach,
   MeetingSlotStudent,
+  Activity,
 } from './types'
 import { ACTION_TYPE_DEFAULTS } from './types'
 import { CoachEventFormDialog, StudentEventFormDialog } from './event-form-dialog'
@@ -66,7 +67,9 @@ function formatDutchDate(dateStr: string): string {
 function formatTimeRange(allDay: boolean, start: string | null, end: string | null): string | null {
   if (allDay) return 'Hele dag'
   if (!start) return null
-  return end ? `${start} – ${end}` : start
+  const s = start.slice(0, 5)
+  const e = end ? end.slice(0, 5) : null
+  return e ? `${s} – ${e}` : s
 }
 
 function LabelDot({ color }: { color: string }) {
@@ -238,7 +241,7 @@ export function CoachDaySheet({
                       >
                         <div>
                           <p className="text-sm font-medium tabular-nums">
-                            {slot.start_time} – {slot.end_time}
+                            {slot.start_time.slice(0, 5)} – {slot.end_time.slice(0, 5)}
                           </p>
                           <p className="text-xs text-muted-foreground">{slot.cycle_title}</p>
                           {slot.booked_student && (
@@ -300,6 +303,7 @@ interface StudentDaySheetProps {
   currentUserId: string
   meetingSlots: MeetingSlotStudent[]
   meetingCycles: MeetingCycle[]
+  activities?: Activity[]
   onClose: () => void
   onCreateEvent: (data: SharedEventCreateData) => Promise<{ error?: string }>
   onUpdateEvent: (id: string, data: SharedEventUpdateData) => Promise<{ error?: string }>
@@ -314,6 +318,7 @@ export function StudentDaySheet({
   currentUserId,
   meetingSlots,
   meetingCycles,
+  activities,
   onClose,
   onCreateEvent,
   onUpdateEvent,
@@ -375,7 +380,7 @@ export function StudentDaySheet({
             </DialogHeader>
 
             <div className="py-4 space-y-3">
-              {dayEvents.length === 0 && meetingSlots.length === 0 && (
+              {dayEvents.length === 0 && meetingSlots.length === 0 && (activities ?? []).length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">
                   Geen items op deze dag
                 </p>
@@ -474,7 +479,7 @@ export function StudentDaySheet({
                       >
                         <div>
                           <p className="text-sm font-medium tabular-nums">
-                            {slot.start_time} – {slot.end_time}
+                            {slot.start_time.slice(0, 5)} – {slot.end_time.slice(0, 5)}
                           </p>
                           <p className="text-xs text-muted-foreground">{slot.cycle_title}</p>
                         </div>
@@ -511,6 +516,32 @@ export function StudentDaySheet({
                             <span className="text-xs text-muted-foreground">Vrij</span>
                           )}
                         </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Activities */}
+              {(activities ?? []).length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-emerald-600 uppercase tracking-wide">Activiteiten</p>
+                  {(activities ?? []).map((activity) => {
+                    const start = activity.start_time ? activity.start_time.slice(0, 5) : null
+                    const end = activity.end_time ? activity.end_time.slice(0, 5) : null
+                    return (
+                      <div key={activity.id} className="rounded-lg border px-3 py-2 space-y-0.5">
+                        <p className="text-sm font-medium">{activity.title}</p>
+                        {(start || activity.location) && (
+                          <p className="text-xs text-muted-foreground">
+                            {start && (end ? `${start} – ${end}` : start)}
+                            {start && activity.location && ' · '}
+                            {activity.location}
+                          </p>
+                        )}
+                        {activity.description && (
+                          <p className="text-xs text-muted-foreground">{activity.description}</p>
+                        )}
                       </div>
                     )
                   })}

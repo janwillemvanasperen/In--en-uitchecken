@@ -8,11 +8,12 @@ import { LogoutButton } from '@/components/logout-button'
 import { NotificationsDropdown } from '@/components/student/notifications-dropdown'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
-import { Menu, Home, User, CalendarDays } from 'lucide-react'
+import { Menu, Home, User, CalendarDays, PartyPopper } from 'lucide-react'
 
 const navItems = [
   { href: '/student/dashboard', label: 'Dashboard', icon: Home },
   { href: '/student/calendar', label: 'Kalender', icon: CalendarDays },
+  { href: '/student/activities', label: 'Activiteiten', icon: PartyPopper },
   { href: '/student/profile', label: 'Profiel', icon: User },
 ]
 

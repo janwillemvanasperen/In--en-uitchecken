@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { requireCoach } from '@/lib/auth'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getCoachEntityId } from '@/lib/coach-utils'
 import { CoachCalendarView } from '@/components/calendar/coach-calendar-view'
 import type { CalendarEvent, CalendarLabel, CalendarStudent, MeetingCycle, MeetingSlotCoach } from '@/components/calendar/types'
 
@@ -10,6 +11,9 @@ export default async function CoachCalendarPage() {
   const user = await requireCoach()
   const supabase = await createClient()
   const adminSupabase = createAdminClient()
+
+  // users.coach_id references coaches.id (entity UUID), not auth.users.id
+  const coachEntityId = await getCoachEntityId(user.id)
 
   const [
     { data: eventsRaw },
@@ -30,20 +34,21 @@ export default async function CoachCalendarPage() {
       .eq('active', true)
       .order('sort_order'),
 
-    supabase
-      .from('users')
-      .select('id, full_name')
-      .eq('role', 'student')
-      .eq('coach_id', user.id)
-      .order('full_name'),
+    coachEntityId
+      ? supabase
+          .from('users')
+          .select('id, full_name')
+          .eq('role', 'student')
+          .eq('coach_id', coachEntityId)
+          .order('full_name')
+      : Promise.resolve({ data: [] }),
 
     supabase
       .from('meeting_cycles')
-      .select('*')
+      .select('*, target_student_ids')
       .eq('coach_id', user.id)
       .order('date_from', { ascending: false }),
 
-    // Use adminClient to fetch slots + bookings without RLS restrictions
     adminSupabase
       .from('meeting_slots')
       .select(`
@@ -54,10 +59,7 @@ export default async function CoachCalendarPage() {
         end_time,
         available,
         meeting_cycles!inner(title, coach_id),
-        meeting_bookings(
-          student_id,
-          users:student_id(id, full_name)
-        )
+        meeting_bookings(student_id)
       `)
       .eq('meeting_cycles.coach_id', user.id)
       .order('slot_date', { ascending: true })
@@ -69,7 +71,18 @@ export default async function CoachCalendarPage() {
   const students: CalendarStudent[] = studentsRaw ?? []
   const meetingCycles: MeetingCycle[] = cyclesRaw ?? []
 
-  // Shape slots into MeetingSlotCoach[]
+  // meeting_bookings.student_id → auth.users, not public.users
+  // PostgREST can't auto-join to public.users through auth.users, so look up names separately
+  const bookedStudentIds = [...new Set(
+    (slotsRaw ?? []).flatMap((s: any) => s.meeting_bookings?.map((b: any) => b.student_id) ?? [])
+  )]
+  const { data: studentNamesRaw } = bookedStudentIds.length > 0
+    ? await adminSupabase.from('users').select('id, full_name').in('id', bookedStudentIds)
+    : { data: [] }
+  const studentNameMap: Record<string, string> = Object.fromEntries(
+    (studentNamesRaw ?? []).map((u: any) => [u.id, u.full_name])
+  )
+
   const meetingSlots: MeetingSlotCoach[] = (slotsRaw ?? []).map((s: any) => {
     const booking = s.meeting_bookings?.[0] ?? null
     return {
@@ -81,8 +94,8 @@ export default async function CoachCalendarPage() {
       end_time: s.end_time,
       available: s.available,
       notes: s.notes ?? null,
-      booked_student: booking?.users
-        ? { id: booking.users.id, full_name: booking.users.full_name }
+      booked_student: booking?.student_id
+        ? { id: booking.student_id, full_name: studentNameMap[booking.student_id] ?? 'Onbekend' }
         : null,
     }
   })
