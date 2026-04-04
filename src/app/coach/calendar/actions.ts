@@ -60,7 +60,7 @@ export async function updateCalendarEvent(
   const coach = await requireCoach()
   const supabase = await createClient()
 
-  // Verify the coach owns this event or it's a shared event of one of their students
+  // Only allow editing events this coach created
   const { data: existing } = await supabase
     .from('calendar_events')
     .select('id, created_by, variant, student_id')
@@ -68,7 +68,7 @@ export async function updateCalendarEvent(
     .single()
 
   if (!existing) return { error: 'Item niet gevonden' }
-  if (existing.created_by !== coach.id && !(existing.variant === 'shared')) {
+  if (existing.created_by !== coach.id) {
     return { error: 'Geen toegang tot dit item' }
   }
 
@@ -102,15 +102,25 @@ export async function updateCalendarEvent(
 }
 
 export async function deleteCalendarEvent(eventId: string): Promise<{ error?: string }> {
-  await requireCoach()
+  const coach = await requireCoach()
   const supabase = await createClient()
+
+  // Verify ownership before deleting
+  const { data: existing } = await supabase
+    .from('calendar_events')
+    .select('created_by')
+    .eq('id', eventId)
+    .single()
+
+  if (!existing) return { error: 'Item niet gevonden' }
+  if (existing.created_by !== coach.id) return { error: 'Geen toegang tot dit item' }
 
   const { error } = await supabase
     .from('calendar_events')
     .delete()
     .eq('id', eventId)
 
-  if (error) return { error: error.message }
+  if (error) return { error: 'Verwijderen mislukt. Probeer het opnieuw.' }
 
   revalidatePath('/coach/calendar')
   revalidatePath('/student/dashboard')
