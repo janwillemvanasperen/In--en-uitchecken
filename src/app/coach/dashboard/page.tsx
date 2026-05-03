@@ -7,6 +7,7 @@ import { getCoachView, getStudentIdsForView, getCoachEntityId } from '@/lib/coac
 import { getMonday, toLocalDateStr } from '@/lib/date-utils'
 import { CoachDashboardTable } from '@/components/coach/coach-dashboard-table'
 import type { StudentGoalRow, GoalNameRow } from '@/components/coach/coach-dashboard-table'
+import { PortfolioSignalsCard } from '@/components/coach/portfolio-signals-card'
 import { Card, CardContent } from '@/components/ui/card'
 
 export const dynamic = 'force-dynamic'
@@ -19,6 +20,10 @@ export default async function CoachDashboard({ searchParams }: { searchParams: P
   const view = getCoachView(sp)
 
   const today = new Date()
+  const fourteenDaysAgo = new Date(today.getTime() - 14 * 24 * 3600 * 1000)
+  const fiveDaysAgo = new Date(today.getTime() - 5 * 24 * 3600 * 1000)
+  const fourteenDaysAgoStr = fourteenDaysAgo.toISOString()
+  const fiveDaysAgoStr = fiveDaysAgo.toISOString()
   const dayOfWeek = today.getDay() || 7
   const todayStr = toLocalDateStr(today)
   const monday = getMonday(today)
@@ -95,6 +100,8 @@ export default async function CoachDashboard({ searchParams }: { searchParams: P
     { data: devGoals },
     { data: goalNames },
     { data: coaches },
+    { data: allPortfolioItems },
+    { data: oldItemsWithFeedback },
   ] = await Promise.all([
     // Who is checked in right now
     supabase
@@ -145,6 +152,19 @@ export default async function CoachDashboard({ searchParams }: { searchParams: P
       .order('goal_number'),
     // Coaches (for name lookup)
     adminClient.from('coaches').select('id, name'),
+    // Most recent portfolio item per student (for "no evidence" signal)
+    adminClient
+      .from('portfolio_items')
+      .select('student_id, created_at')
+      .in('student_id', allIds)
+      .order('created_at', { ascending: false }),
+    // Items older than 5 days, with feedback embedded (for "pending feedback" signal)
+    adminClient
+      .from('portfolio_items')
+      .select('id, title, goal_number, student_id, created_at, portfolio_feedback(id)')
+      .in('student_id', allIds)
+      .lt('created_at', fiveDaysAgoStr)
+      .order('created_at', { ascending: true }),
   ])
 
   // Build maps
@@ -212,6 +232,43 @@ export default async function CoachDashboard({ searchParams }: { searchParams: P
     }
   })
 
+  // Portfolio signals
+  // 1. Most recent item per student
+  const lastItemMap: Record<string, string> = {}
+  for (const item of allPortfolioItems || []) {
+    if (!lastItemMap[item.student_id]) lastItemMap[item.student_id] = item.created_at
+  }
+
+  const noEvidenceStudents = (allStudents || [])
+    .filter((s: any) => {
+      const last = lastItemMap[s.id]
+      return !last || last < fourteenDaysAgoStr
+    })
+    .map((s: any) => {
+      const last = lastItemMap[s.id]
+      const daysSinceLastItem = last
+        ? Math.floor((today.getTime() - new Date(last).getTime()) / 86400000)
+        : null
+      return { id: s.id, full_name: s.full_name, daysSinceLastItem }
+    })
+    .slice(0, 10)
+
+  // 2. Items > 5 days without any feedback
+  const studentNameMap: Record<string, string> = {}
+  for (const s of allStudents || []) studentNameMap[s.id] = s.full_name
+
+  const pendingFeedbackItems = (oldItemsWithFeedback || [])
+    .filter((item: any) => (item.portfolio_feedback || []).length === 0)
+    .map((item: any) => ({
+      id: item.id,
+      title: item.title,
+      goal_number: item.goal_number,
+      student_id: item.student_id,
+      student_name: studentNameMap[item.student_id] || 'Onbekend',
+      daysWaiting: Math.floor((today.getTime() - new Date(item.created_at).getTime()) / 86400000),
+    }))
+    .slice(0, 10)
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -221,6 +278,12 @@ export default async function CoachDashboard({ searchParams }: { searchParams: P
           counts={{ mijnStudenten: myStudentCount, mijnKlas: myKlasCount, alle: allCount || 0 }}
         />
       </div>
+
+      <PortfolioSignalsCard
+        noEvidenceStudents={noEvidenceStudents}
+        pendingFeedbackItems={pendingFeedbackItems}
+        view={view}
+      />
 
       <CoachDashboardTable students={tableRows} goalNames={finalGoalNames} view={view} />
     </div>
