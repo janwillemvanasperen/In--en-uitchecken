@@ -6,6 +6,8 @@ import { ProgressAndLeaveCard } from '@/components/student/progress-and-leave-ca
 import { WeekScheduleCard } from '@/components/student/week-schedule-card'
 import { DevelopmentGoalsCard } from '@/components/student/development-goals-card'
 import { UpcomingEventsCard } from '@/components/student/upcoming-events-card'
+import { PortfolioActivityCard } from '@/components/student/portfolio-activity-card'
+import { WeekHoursHistoryCard } from '@/components/student/week-hours-history-card'
 import { getMonday, toLocalDateStr } from '@/lib/date-utils'
 import type { DayData } from '@/components/student/week-history-view'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -232,6 +234,50 @@ export default async function StudentDashboard() {
     .order('created_at', { ascending: false })
     .limit(3)
 
+  // Portfolio feedback + assessments for dashboard cards
+  const [{ data: recentFeedbackRaw }, { data: recentAssessmentsRaw }, { data: historyCheckIns }] = await Promise.all([
+    supabase
+      .from('portfolio_feedback')
+      .select('id, feedback_text, created_at, portfolio_items!inner(title, goal_number, student_id)')
+      .eq('portfolio_items.student_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(4),
+    adminClient
+      .from('portfolio_assessments')
+      .select('id, goal_number, phase_assessed, result, created_at')
+      .eq('student_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(5),
+    supabase
+      .from('check_ins')
+      .select('check_in_time, check_out_time')
+      .eq('user_id', user.id)
+      .not('check_out_time', 'is', null)
+      .order('check_in_time', { ascending: false })
+      .limit(200),
+  ])
+
+  // Attach goal names to assessments
+  const recentAssessments = (recentAssessmentsRaw || []).map((a: any) => ({
+    ...a,
+    goal_name: (goalNames || []).find((gn: any) => gn.goal_number === a.goal_number)?.goal_name ?? undefined,
+  }))
+
+  // Build week-by-week hours for last 8 weeks
+  const weekHoursMap: Record<string, number> = {}
+  for (const ci of historyCheckIns || []) {
+    if (ci.check_out_time) {
+      const w = toLocalDateStr(getMonday(new Date(ci.check_in_time)))
+      const h = (new Date(ci.check_out_time).getTime() - new Date(ci.check_in_time).getTime()) / 3600000
+      weekHoursMap[w] = (weekHoursMap[w] || 0) + h
+    }
+  }
+  const weekHoursHistory = Object.entries(weekHoursMap)
+    .sort(([a], [b]) => b.localeCompare(a))
+    .slice(0, 8)
+    .reverse()
+    .map(([weekStart, hours]) => ({ weekStart, hours }))
+
   // Upcoming calendar events (next 14 days)
   const in14Days = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000)
   const in14DaysStr = toLocalDateStr(in14Days)
@@ -368,6 +414,16 @@ export default async function StudentDashboard() {
       </div>
 
       <DevelopmentGoalsCard goalPhases={goalPhases} goalNames={finalGoalNames} />
+
+      <PortfolioActivityCard
+        recentFeedback={recentFeedbackRaw || []}
+        recentAssessments={recentAssessments}
+      />
+
+      <WeekHoursHistoryCard
+        weeks={weekHoursHistory}
+        targetHours={scheduledWeeklyHours > 0 ? scheduledWeeklyHours : 16}
+      />
 
       <UpcomingEventsCard events={upcomingEvents} bookedSlots={upcomingBookedSlots} />
     </div>

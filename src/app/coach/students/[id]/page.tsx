@@ -8,9 +8,11 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { NoteEditor } from '@/components/coach/note-editor'
+import { PortfolioTab } from '@/components/coach/portfolio-tab'
 import { getCoachView, getCoachEntityId } from '@/lib/coach-utils'
 import { ArrowLeft, Star, Clock, CalendarDays, FileText, CheckCircle2, XCircle, AlertTriangle, Briefcase } from 'lucide-react'
 import { getMonday, toLocalDateStr } from '@/lib/date-utils'
+import { addPortfolioFeedback, assessPortfolioPhase } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -60,6 +62,9 @@ export default async function CoachStudentDetailPage({
     { data: weekCheckIns },
     { data: noteLabels },
     { data: otherCoaches },
+    { data: goalNamesRaw },
+    { data: devGoals },
+    { data: portfolioItems },
   ] = await Promise.all([
     adminClient.from('schedules').select('*').eq('user_id', studentId).order('valid_from', { ascending: false }),
     adminClient.from('check_ins').select('*, locations!check_ins_location_id_fkey(name)').eq('user_id', studentId).order('check_in_time', { ascending: false }).limit(50),
@@ -69,6 +74,9 @@ export default async function CoachStudentDetailPage({
     adminClient.from('check_ins').select('*').eq('user_id', studentId).gte('check_in_time', mondayStr + 'T00:00:00').not('check_out_time', 'is', null),
     adminClient.from('note_labels').select('id, name, color').eq('active', true).order('sort_order'),
     adminClient.from('users').select('id, full_name').contains('roles', ['coach']).neq('id', coach.id).order('full_name'),
+    adminClient.from('development_goal_names').select('goal_number, goal_name, description').eq('active', true).order('goal_number'),
+    adminClient.from('student_development_goals').select('goal_1_phase, goal_2_phase, goal_3_phase, goal_4_phase, goal_5_phase, goal_6_phase').eq('student_id', studentId).single(),
+    adminClient.from('portfolio_items').select('*, portfolio_feedback(id, feedback_text, created_at, coach_id)').eq('student_id', studentId).order('created_at', { ascending: false }),
   ])
 
   // Today's schedule
@@ -115,6 +123,34 @@ export default async function CoachStudentDetailPage({
   const weekHistory = Object.entries(weekHistoryMap)
     .sort(([a], [b]) => b.localeCompare(a))
     .slice(0, 12)
+
+  // Portfolio data for werk tab
+  const portfolioPhases = [
+    devGoals?.goal_1_phase ?? 0,
+    devGoals?.goal_2_phase ?? 0,
+    devGoals?.goal_3_phase ?? 0,
+    devGoals?.goal_4_phase ?? 0,
+    devGoals?.goal_5_phase ?? 0,
+    devGoals?.goal_6_phase ?? 0,
+  ]
+  const itemsByGoal: Record<number, any[]> = {}
+  for (const item of portfolioItems || []) {
+    if (!itemsByGoal[item.goal_number]) itemsByGoal[item.goal_number] = []
+    itemsByGoal[item.goal_number].push(item)
+  }
+  const portfolioGoals = Array.from({ length: 6 }, (_, i) => {
+    const found = (goalNamesRaw || []).find((gn: any) => gn.goal_number === i + 1)
+    return {
+      goal_number: i + 1,
+      goal_name: found?.goal_name ?? `Doel ${i + 1}`,
+      description: found?.description ?? null,
+      phase: portfolioPhases[i],
+      items: itemsByGoal[i + 1] || [],
+    }
+  })
+
+  const boundAddFeedback = addPortfolioFeedback
+  const boundAssess = assessPortfolioPhase.bind(null, studentId)
 
   const tabs = [
     { id: 'overzicht', label: 'Overzicht' },
@@ -184,12 +220,7 @@ export default async function CoachStudentDetailPage({
               }`}
             >
               {tab.label}
-              {tab.id === 'werk' && (
-                <span className="ml-1.5 inline-flex text-xs bg-[#ffd100]/20 text-[#ffd100] px-1 rounded">
-                  Binnenkort
-                </span>
-              )}
-            </Link>
+              </Link>
           ))}
         </div>
       </div>
@@ -455,29 +486,11 @@ export default async function CoachStudentDetailPage({
       )}
 
       {activeTab === 'werk' && (
-        <div className="space-y-4">
-          <div className="rounded-xl border-2 border-dashed border-[#ffd100]/40 bg-[#ffd100]/5 p-8 text-center">
-            <Briefcase className="h-10 w-10 mx-auto text-[#ffd100]/60 mb-3" />
-            <h3 className="font-semibold text-base mb-1">Werk & Bewijsstukken</h3>
-            <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-              Binnenkort kunnen studenten bewijsstukken indienen. Je kunt ze dan hier bekijken, reviewen en feedback geven.
-            </p>
-            <Badge className="mt-4 bg-[#ffd100]/20 text-[#ffd100] border-[#ffd100]/30">Binnenkort beschikbaar</Badge>
-          </div>
-          <Card className="opacity-60 pointer-events-none select-none">
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Statistieken (voorbeeld)</CardTitle></CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                {['Totaal ingediend', 'Wacht op review', 'Gem. beoordeling', 'Laatste indiening'].map((label) => (
-                  <div key={label} className="p-3 rounded border bg-muted/30">
-                    <p className="text-xs text-muted-foreground">{label}</p>
-                    <p className="text-xl font-bold mt-1">–</p>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <PortfolioTab
+          goals={portfolioGoals}
+          onFeedback={boundAddFeedback}
+          onAssess={boundAssess}
+        />
       )}
     </div>
   )
