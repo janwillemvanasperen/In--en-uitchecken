@@ -152,6 +152,11 @@ export default async function CoachStudentDetailPage({
   const boundAddFeedback = addPortfolioFeedback
   const boundAssess = assessPortfolioPhase.bind(null, studentId)
 
+  // Count items without feedback for the tab badge
+  const werkBadge = (portfolioItems || []).filter(
+    (item: any) => (item.portfolio_feedback || []).length === 0
+  ).length
+
   const tabs = [
     { id: 'overzicht', label: 'Overzicht' },
     { id: 'rooster', label: 'Rooster' },
@@ -159,7 +164,7 @@ export default async function CoachStudentDetailPage({
     { id: 'weekoverzicht', label: 'Weekoverzicht' },
     { id: 'verlof', label: 'Verlofaanvragen' },
     { id: 'notities', label: 'Notities' },
-    { id: 'werk', label: 'Werk & Bewijsstukken' },
+    { id: 'werk', label: 'Werk & Bewijsstukken', badge: werkBadge },
   ]
 
   const statusBadge = (status: string) => {
@@ -220,7 +225,12 @@ export default async function CoachStudentDetailPage({
               }`}
             >
               {tab.label}
-              </Link>
+              {(tab as any).badge > 0 && (
+                <span className="ml-1.5 inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold">
+                  {(tab as any).badge}
+                </span>
+              )}
+            </Link>
           ))}
         </div>
       </div>

@@ -3,6 +3,7 @@ import { requireStudent } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { StudentHeader } from '@/components/student/student-header'
 import { Breadcrumb } from '@/components/student/breadcrumb'
+import { MobileBottomNav } from '@/components/student/mobile-bottom-nav'
 
 export default async function StudentLayout({
   children,
@@ -27,8 +28,19 @@ export default async function StudentLayout({
     .order('created_at', { ascending: false })
     .limit(20)
 
-  // Count unread
+  // Count unread notifications
   const unreadCount = (notifications || []).filter((n: any) => !n.read).length
+
+  // Count new portfolio feedback (last 7 days) for bottom nav badge
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString()
+  const { count: newFeedbackCount } = await supabase
+    .from('portfolio_feedback')
+    .select('id', { count: 'exact', head: true })
+    .gte('created_at', sevenDaysAgo)
+
+  const badgeCounts: Record<string, number> = {
+    portfolio: newFeedbackCount || 0,
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -44,9 +56,10 @@ export default async function StudentLayout({
         unreadCount={unreadCount}
       />
       <Breadcrumb />
-      <main className="container mx-auto px-4 py-6">
+      <main className="container mx-auto px-4 py-6 pb-24 md:pb-6">
         {children}
       </main>
+      <MobileBottomNav badgeCounts={badgeCounts} />
     </div>
   )
 }
