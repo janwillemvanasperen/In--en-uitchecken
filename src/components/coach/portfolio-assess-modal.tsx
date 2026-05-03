@@ -8,47 +8,79 @@ import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, AlertTriangle, TrendingUp } from 'lucide-react'
 
+type Score = 'onvoldoende' | 'voldoende' | 'goed'
+
+const SCORE_VALUE: Record<Score, number> = { onvoldoende: 0, voldoende: 1, goed: 2 }
+
+const SCORE_STYLES: Record<Score, string> = {
+  onvoldoende: 'border-red-300 bg-red-50 text-red-700 ring-red-400',
+  voldoende: 'border-yellow-300 bg-yellow-50 text-yellow-700 ring-yellow-400',
+  goed: 'border-green-300 bg-green-50 text-green-700 ring-green-400',
+}
+
+interface RubricCriterion {
+  id: string
+  criterion_text: string
+  description_insufficient: string
+  description_sufficient: string
+  description_good: string
+  sort_order: number
+}
+
 interface Props {
   open: boolean
   onClose: () => void
   goalName: string
   goalNumber: number
-  currentPhase: number
-  phaseLabel: string
+  phaseToAssess: number
+  criteria: RubricCriterion[]
   onSubmit: (
     goalNumber: number,
     phaseAssessed: number,
-    result: 'onvoldoende' | 'voldoende' | 'goed',
+    scores: { criterion_id: string; score: Score }[],
     notes?: string
   ) => Promise<{ error?: string }>
 }
 
-const RESULTS: { value: 'onvoldoende' | 'voldoende' | 'goed'; label: string; description: string; color: string }[] = [
-  { value: 'onvoldoende', label: 'Onvoldoende', description: 'Student is nog niet klaar voor de volgende fase', color: 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100' },
-  { value: 'voldoende', label: 'Voldoende', description: 'Student gaat één fase vooruit', color: 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100' },
-  { value: 'goed', label: 'Goed', description: 'Student gaat één fase vooruit', color: 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' },
-]
-
 export function PortfolioAssessModal({
-  open, onClose, goalName, goalNumber, currentPhase, phaseLabel, onSubmit,
+  open, onClose, goalName, goalNumber, phaseToAssess, criteria, onSubmit,
 }: Props) {
-  const [result, setResult] = useState<'onvoldoende' | 'voldoende' | 'goed' | null>(null)
+  const [scores, setScores] = useState<Record<string, Score>>({})
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const scoredCount = Object.keys(scores).length
+  const allScored = criteria.length > 0 && scoredCount === criteria.length
+
+  const total = Object.values(scores).reduce((sum, s) => sum + SCORE_VALUE[s], 0)
+  const maxPossible = criteria.length * 2
+  const pct = maxPossible > 0 ? Math.round((total / maxPossible) * 100) : 0
+  const projectedResult: Score = pct >= 80 ? 'goed' : pct >= 50 ? 'voldoende' : 'onvoldoende'
+
+  function setScore(criterionId: string, score: Score) {
+    setScores((prev) => ({ ...prev, [criterionId]: score }))
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!result) return
+    if (!allScored) return
     setLoading(true)
     setError(null)
-    const res = await onSubmit(goalNumber, currentPhase, result, notes || undefined)
+
+    const scoresList = criteria.map((c) => ({
+      criterion_id: c.id,
+      score: scores[c.id],
+    }))
+
+    const res = await onSubmit(goalNumber, phaseToAssess, scoresList, notes || undefined)
     if (res.error) {
       setError(res.error)
       setLoading(false)
       return
     }
-    setResult(null)
+
+    setScores({})
     setNotes('')
     setLoading(false)
     onClose()
@@ -56,83 +88,132 @@ export function PortfolioAssessModal({
 
   function handleClose() {
     if (loading) return
-    setResult(null)
+    setScores({})
     setNotes('')
     setError(null)
     onClose()
   }
 
-  const willAdvance = result === 'voldoende' || result === 'goed'
+  const willAdvance = allScored && (projectedResult === 'voldoende' || projectedResult === 'goed')
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Fase beoordelen</DialogTitle>
+          <DialogTitle>Fase {phaseToAssess} beoordelen</DialogTitle>
           <p className="text-sm text-muted-foreground truncate">{goalName}</p>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="flex items-center gap-2 text-sm p-3 rounded-lg bg-muted/50">
-            <span className="text-muted-foreground">Huidige fase:</span>
-            <span className="font-medium">{phaseLabel}</span>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Beoordeling <span className="text-destructive">*</span></Label>
-            <div className="space-y-2">
-              {RESULTS.map((r) => (
-                <button
-                  key={r.value}
-                  type="button"
-                  onClick={() => setResult(r.value)}
-                  disabled={loading}
-                  className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
-                    result === r.value ? r.color + ' ring-2 ring-offset-1 ring-current' : 'border-border bg-card hover:bg-muted/50'
-                  }`}
-                >
-                  <p className="font-medium text-sm">{r.label}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{r.description}</p>
-                </button>
+        {criteria.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4">
+            Geen beoordelingscriteria gevonden voor deze fase.
+          </p>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-3">
+              {criteria.map((c, idx) => (
+                <div key={c.id} className="border rounded-lg p-3 space-y-2">
+                  <p className="text-sm font-medium">
+                    <span className="text-muted-foreground mr-2">{idx + 1}.</span>
+                    {c.criterion_text}
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['onvoldoende', 'voldoende', 'goed'] as Score[]).map((s) => {
+                      const isSelected = scores[c.id] === s
+                      const desc =
+                        s === 'onvoldoende'
+                          ? c.description_insufficient
+                          : s === 'voldoende'
+                          ? c.description_sufficient
+                          : c.description_good
+                      return (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => setScore(c.id, s)}
+                          disabled={loading}
+                          className={`text-left p-2 rounded-md border-2 transition-all text-xs ${
+                            isSelected
+                              ? SCORE_STYLES[s] + ' ring-2 ring-offset-1'
+                              : 'border-border bg-card hover:bg-muted/50'
+                          }`}
+                        >
+                          <p className="font-semibold capitalize">{s}</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug line-clamp-3">
+                            {desc}
+                          </p>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
               ))}
             </div>
-          </div>
 
-          {willAdvance && (
-            <div className="flex items-center gap-2 text-sm p-3 rounded-lg bg-green-50 text-green-700 border border-green-200">
-              <TrendingUp className="h-4 w-4 shrink-0" />
-              <span>Student gaat naar de volgende fase</span>
+            {scoredCount > 0 && (
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 text-sm">
+                <span className="text-muted-foreground">
+                  Score: {total}/{maxPossible} ({pct}%)
+                </span>
+                {allScored && (
+                  <span
+                    className={`font-medium capitalize ${
+                      projectedResult === 'goed'
+                        ? 'text-green-600'
+                        : projectedResult === 'voldoende'
+                        ? 'text-yellow-600'
+                        : 'text-red-600'
+                    }`}
+                  >
+                    → {projectedResult}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {willAdvance && (
+              <div className="flex items-center gap-2 text-sm p-3 rounded-lg bg-green-50 text-green-700 border border-green-200">
+                <TrendingUp className="h-4 w-4 shrink-0" />
+                <span>Student gaat naar de volgende fase</span>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notitie (optioneel)</Label>
+              <Textarea
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Toelichting bij de beoordeling..."
+                rows={2}
+                disabled={loading}
+              />
             </div>
-          )}
 
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notitie (optioneel)</Label>
-            <Textarea
-              id="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Toelichting bij de beoordeling..."
-              rows={2}
-              disabled={loading}
-            />
-          </div>
+            {error && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
 
-          {error && (
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          <div className="flex gap-2 justify-end">
-            <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
-              Annuleren
-            </Button>
-            <Button type="submit" disabled={loading || !result}>
-              {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Opslaan...</> : 'Beoordeling opslaan'}
-            </Button>
-          </div>
-        </form>
+            <div className="flex gap-2 justify-end">
+              <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
+                Annuleren
+              </Button>
+              <Button type="submit" disabled={loading || !allScored}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Opslaan...
+                  </>
+                ) : (
+                  `Beoordeling opslaan (${scoredCount}/${criteria.length})`
+                )}
+              </Button>
+            </div>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   )

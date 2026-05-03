@@ -1,7 +1,7 @@
 import { GoalPhaseCircle } from '@/components/shared/goal-phase-circle'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-const PHASE_LABELS = ['Onbekend', 'Oriëntatie', 'Ontwikkeling', 'Beheersing', 'Expert']
+const PHASE_LABELS = ['Nog niet begonnen', 'Fase 1', 'Fase 2', 'Fase 3', 'Afgerond']
 
 interface GoalName {
   goal_number: number

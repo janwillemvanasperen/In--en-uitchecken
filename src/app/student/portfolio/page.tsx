@@ -6,8 +6,6 @@ import { addPortfolioItem, deletePortfolioItem } from './actions'
 
 export const dynamic = 'force-dynamic'
 
-const PHASE_LABELS = ['Onbekend', 'Oriëntatie', 'Ontwikkeling', 'Beheersing', 'Expert']
-
 export default async function StudentPortfolioPage() {
   const user = await requireStudent()
   const supabase = await createClient()
@@ -17,6 +15,7 @@ export default async function StudentPortfolioPage() {
     { data: goalNamesRaw },
     { data: devGoals },
     { data: items },
+    { data: rubricCriteria },
   ] = await Promise.all([
     adminClient
       .from('development_goal_names')
@@ -33,6 +32,13 @@ export default async function StudentPortfolioPage() {
       .select('*, portfolio_feedback(id, feedback_text, created_at, coach_id)')
       .eq('student_id', user.id)
       .order('created_at', { ascending: false }),
+    adminClient
+      .from('rubric_criteria')
+      .select('goal_number, phase, phase_description')
+      .eq('active', true)
+      .order('goal_number')
+      .order('phase')
+      .order('sort_order'),
   ])
 
   const goalNames = Array.from({ length: 6 }, (_, i) => {
@@ -49,10 +55,23 @@ export default async function StudentPortfolioPage() {
     devGoals?.goal_6_phase ?? 0,
   ]
 
-  const itemsByGoal: Record<number, any[]> = {}
+  // Build phase descriptions: { [goal_number]: { [phase]: description } }
+  const phaseDescriptions: Record<number, Record<number, string>> = {}
+  for (const rc of rubricCriteria || []) {
+    if (!phaseDescriptions[rc.goal_number]) phaseDescriptions[rc.goal_number] = {}
+    if (!phaseDescriptions[rc.goal_number][rc.phase] && rc.phase_description) {
+      phaseDescriptions[rc.goal_number][rc.phase] = rc.phase_description
+    }
+  }
+
+  // Group items by goal_number → phase
+  const itemsByGoalPhase: Record<number, Record<number, any[]>> = {}
   for (const item of items || []) {
-    if (!itemsByGoal[item.goal_number]) itemsByGoal[item.goal_number] = []
-    itemsByGoal[item.goal_number].push(item)
+    const g = item.goal_number
+    const p = item.phase || 1
+    if (!itemsByGoalPhase[g]) itemsByGoalPhase[g] = {}
+    if (!itemsByGoalPhase[g][p]) itemsByGoalPhase[g][p] = []
+    itemsByGoalPhase[g][p].push(item)
   }
 
   return (
@@ -60,7 +79,7 @@ export default async function StudentPortfolioPage() {
       <div>
         <h1 className="text-2xl font-bold">Mijn portfolio</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Voeg bewijs toe per ontwikkeldoel en vraag feedback aan je coach.
+          Voeg bewijs toe per ontwikkeldoel en fase, en vraag feedback aan je coach.
         </p>
       </div>
 
@@ -70,9 +89,9 @@ export default async function StudentPortfolioPage() {
           goalNumber={goal.goal_number}
           goalName={goal.goal_name}
           goalDescription={goal.description}
-          phase={phases[i]}
-          phaseLabel={PHASE_LABELS[phases[i]]}
-          items={itemsByGoal[goal.goal_number] || []}
+          currentPhase={phases[i]}
+          phaseDescriptions={phaseDescriptions[goal.goal_number] || {}}
+          itemsByPhase={itemsByGoalPhase[goal.goal_number] || {}}
           onAdd={addPortfolioItem}
           onDelete={deletePortfolioItem}
         />

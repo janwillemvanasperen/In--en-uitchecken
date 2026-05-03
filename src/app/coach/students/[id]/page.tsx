@@ -65,6 +65,7 @@ export default async function CoachStudentDetailPage({
     { data: goalNamesRaw },
     { data: devGoals },
     { data: portfolioItems },
+    { data: rubricCriteria },
   ] = await Promise.all([
     adminClient.from('schedules').select('*').eq('user_id', studentId).order('valid_from', { ascending: false }),
     adminClient.from('check_ins').select('*, locations!check_ins_location_id_fkey(name)').eq('user_id', studentId).order('check_in_time', { ascending: false }).limit(50),
@@ -77,6 +78,7 @@ export default async function CoachStudentDetailPage({
     adminClient.from('development_goal_names').select('goal_number, goal_name, description').eq('active', true).order('goal_number'),
     adminClient.from('student_development_goals').select('goal_1_phase, goal_2_phase, goal_3_phase, goal_4_phase, goal_5_phase, goal_6_phase').eq('student_id', studentId).single(),
     adminClient.from('portfolio_items').select('*, portfolio_feedback(id, feedback_text, created_at, coach_id)').eq('student_id', studentId).order('created_at', { ascending: false }),
+    adminClient.from('rubric_criteria').select('id, goal_number, phase, criterion_text, description_insufficient, description_sufficient, description_good, sort_order').eq('active', true).order('goal_number').order('phase').order('sort_order'),
   ])
 
   // Today's schedule
@@ -498,6 +500,7 @@ export default async function CoachStudentDetailPage({
       {activeTab === 'werk' && (
         <PortfolioTab
           goals={portfolioGoals}
+          rubricCriteria={rubricCriteria || []}
           onFeedback={boundAddFeedback}
           onAssess={boundAssess}
         />

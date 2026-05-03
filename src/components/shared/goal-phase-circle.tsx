@@ -1,11 +1,11 @@
 'use client'
 
 const PHASE_STYLES = [
-  { bg: 'bg-gray-200', text: 'text-gray-500',   label: 'Niet gestart' },
-  { bg: 'bg-blue-100', text: 'text-blue-600',   label: 'Oriënterend' },
-  { bg: 'bg-blue-500', text: 'text-white',       label: 'Ontwikkelend' },
-  { bg: 'bg-[#ffd100]', text: 'text-black',      label: 'Gevorderd' },
-  { bg: 'bg-green-500', text: 'text-white',      label: 'Expert' },
+  { bg: 'bg-gray-200', text: 'text-gray-500',    label: 'Nog niet begonnen' },
+  { bg: 'bg-blue-100', text: 'text-blue-700',    label: 'Fase 1' },
+  { bg: 'bg-blue-400', text: 'text-white',        label: 'Fase 2' },
+  { bg: 'bg-[#ffd100]', text: 'text-black',       label: 'Fase 3' },
+  { bg: 'bg-green-500', text: 'text-white',       label: 'Afgerond' },
 ]
 
 interface GoalPhaseCircleProps {

@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { GoalPhaseCircle } from '@/components/shared/goal-phase-circle'
 import { upsertStudentGoalPhases } from '@/app/admin/actions'
 
-const PHASE_LABELS = ['Onbekend', 'Oriëntatie', 'Ontwikkeling', 'Beheersing', 'Expert']
+const PHASE_LABELS = ['Nog niet begonnen', 'Fase 1', 'Fase 2', 'Fase 3', 'Afgerond']
 
 interface StudentWithGoals {
   id: string

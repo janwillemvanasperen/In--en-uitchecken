@@ -7,6 +7,7 @@ import { revalidatePath } from 'next/cache'
 
 export async function addPortfolioItem(data: {
   goal_number: number
+  phase: number
   title: string
   description?: string
   link_url?: string
@@ -22,6 +23,7 @@ export async function addPortfolioItem(data: {
   const { error } = await supabase.from('portfolio_items').insert({
     student_id: user.id,
     goal_number: data.goal_number,
+    phase: data.phase,
     title: data.title.trim(),
     description: data.description?.trim() || null,
     link_url: data.link_url?.trim() || null,

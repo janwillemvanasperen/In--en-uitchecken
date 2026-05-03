@@ -4,12 +4,23 @@ import { useState } from 'react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { MessageSquare, Star, ChevronDown, ChevronUp, ExternalLink, ClipboardCheck } from 'lucide-react'
+import { MessageSquare, ChevronDown, ChevronUp, ExternalLink, ClipboardCheck, CheckCircle2 } from 'lucide-react'
 import { GoalPhaseCircle } from '@/components/shared/goal-phase-circle'
 import { PortfolioFeedbackModal } from './portfolio-feedback-modal'
 import { PortfolioAssessModal } from './portfolio-assess-modal'
 
-const PHASE_LABELS = ['Onbekend', 'Oriëntatie', 'Ontwikkeling', 'Beheersing', 'Expert']
+type Score = 'onvoldoende' | 'voldoende' | 'goed'
+
+interface RubricCriterion {
+  id: string
+  goal_number: number
+  phase: number
+  criterion_text: string
+  description_insufficient: string
+  description_sufficient: string
+  description_good: string
+  sort_order: number
+}
 
 interface FeedbackItem {
   id: string
@@ -22,6 +33,7 @@ interface PortfolioItem {
   title: string
   description: string | null
   link_url: string | null
+  phase: number
   created_at: string
   portfolio_feedback: FeedbackItem[]
 }
@@ -36,11 +48,12 @@ interface GoalData {
 
 interface Props {
   goals: GoalData[]
+  rubricCriteria: RubricCriterion[]
   onFeedback: (itemId: string, feedbackText: string) => Promise<{ error?: string }>
   onAssess: (
     goalNumber: number,
     phaseAssessed: number,
-    result: 'onvoldoende' | 'voldoende' | 'goed',
+    scores: { criterion_id: string; score: Score }[],
     notes?: string
   ) => Promise<{ error?: string }>
 }
@@ -55,7 +68,10 @@ function PortfolioItemRow({
   const [expanded, setExpanded] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
 
-  const date = new Date(item.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+  const date = new Date(item.created_at).toLocaleDateString('nl-NL', {
+    day: 'numeric',
+    month: 'short',
+  })
 
   return (
     <Card className="border-l-4 border-l-muted">
@@ -82,8 +98,17 @@ function PortfolioItemRow({
                 </Button>
               </a>
             )}
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpanded(!expanded)}>
-              {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => setExpanded(!expanded)}
+            >
+              {expanded ? (
+                <ChevronUp className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronDown className="h-3.5 w-3.5" />
+              )}
             </Button>
             <Button
               variant="outline"
@@ -104,12 +129,18 @@ function PortfolioItemRow({
             )}
             {item.portfolio_feedback.length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Eerder gegeven feedback</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Eerder gegeven feedback
+                </p>
                 {item.portfolio_feedback.map((fb) => (
                   <div key={fb.id} className="rounded-md bg-muted px-3 py-2">
                     <p className="text-sm">{fb.feedback_text}</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {new Date(fb.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {new Date(fb.created_at).toLocaleDateString('nl-NL', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
                     </p>
                   </div>
                 ))}
@@ -129,73 +160,171 @@ function PortfolioItemRow({
   )
 }
 
-function GoalSection({
-  goal,
+function PhaseSection({
+  phaseNum,
+  items,
+  isPassed,
+  isNext,
+  criteria,
+  goalNumber,
+  goalName,
   onFeedback,
   onAssess,
 }: {
-  goal: GoalData
-  onFeedback: (itemId: string, feedbackText: string) => Promise<{ error?: string }>
+  phaseNum: number
+  items: PortfolioItem[]
+  isPassed: boolean
+  isNext: boolean
+  criteria: RubricCriterion[]
+  goalNumber: number
+  goalName: string
+  onFeedback: Props['onFeedback']
   onAssess: Props['onAssess']
 }) {
+  const [open, setOpen] = useState(isNext || (isPassed && items.length > 0))
   const [assessOpen, setAssessOpen] = useState(false)
-  const phase = goal.phase
-  const phaseLabel = PHASE_LABELS[phase] ?? 'Onbekend'
-  const canAdvance = phase < 4
+
+  const canAssess = isNext && items.length > 0 && criteria.length > 0
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <GoalPhaseCircle phase={phase} goalName={goal.goal_name} description={goal.description} size="md" />
-            <div className="min-w-0">
-              <p className="font-medium truncate">{goal.goal_name}</p>
-              <Badge variant="outline" className="text-xs mt-0.5">{phaseLabel}</Badge>
-            </div>
-          </div>
-          {canAdvance && goal.items.length > 0 && (
+    <div
+      className={`rounded-lg border ${
+        isPassed ? 'border-green-200 bg-green-50/40' : isNext ? 'border-primary/40 bg-primary/5' : 'border-border'
+      }`}
+    >
+      <button
+        type="button"
+        className="w-full flex items-center justify-between px-4 py-3 text-left"
+        onClick={() => setOpen(!open)}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          {isPassed ? (
+            <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+          ) : (
+            <GoalPhaseCircle phase={isNext ? phaseNum : 0} size="sm" />
+          )}
+          <span className={`text-sm font-medium ${isPassed ? 'text-green-700' : ''}`}>
+            Fase {phaseNum}{isPassed ? ' — beoordeeld' : ''}
+          </span>
+          {items.length > 0 && (
+            <span className="text-xs text-muted-foreground shrink-0">({items.length} bewijsstukken)</span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {canAssess && (
             <Button
               size="sm"
               variant="outline"
-              onClick={() => setAssessOpen(true)}
-              className="shrink-0 gap-1"
+              onClick={(e) => {
+                e.stopPropagation()
+                setAssessOpen(true)
+              }}
+              className="h-7 text-xs gap-1"
             >
-              <ClipboardCheck className="h-4 w-4" />
+              <ClipboardCheck className="h-3.5 w-3.5" />
               Beoordelen
             </Button>
           )}
+          {open ? (
+            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          )}
         </div>
-      </CardHeader>
+      </button>
 
-      {goal.items.length > 0 ? (
-        <CardContent className="pt-0 space-y-2">
-          {goal.items.map((item) => (
-            <PortfolioItemRow key={item.id} item={item} onFeedback={onFeedback} />
-          ))}
-        </CardContent>
-      ) : (
-        <CardContent className="pt-0">
-          <p className="text-sm text-muted-foreground">Nog geen bewijs ingediend.</p>
-        </CardContent>
+      {open && (
+        <div className="px-4 pb-4 space-y-2">
+          {items.length > 0 ? (
+            items.map((item) => (
+              <PortfolioItemRow key={item.id} item={item} onFeedback={onFeedback} />
+            ))
+          ) : (
+            <p className="text-sm text-muted-foreground">Nog geen bewijs voor fase {phaseNum}.</p>
+          )}
+        </div>
       )}
 
       <PortfolioAssessModal
         open={assessOpen}
         onClose={() => setAssessOpen(false)}
-        goalName={goal.goal_name}
-        goalNumber={goal.goal_number}
-        currentPhase={phase}
-        phaseLabel={phaseLabel}
-        onSubmit={(goalNumber, phaseAssessed, result, notes) =>
-          onAssess(goalNumber, phaseAssessed, result, notes)
-        }
+        goalName={goalName}
+        goalNumber={goalNumber}
+        phaseToAssess={phaseNum}
+        criteria={criteria}
+        onSubmit={(goalNum, phase, scores, notes) => onAssess(goalNum, phase, scores, notes)}
       />
+    </div>
+  )
+}
+
+function GoalSection({
+  goal,
+  rubricCriteria,
+  onFeedback,
+  onAssess,
+}: {
+  goal: GoalData
+  rubricCriteria: RubricCriterion[]
+  onFeedback: Props['onFeedback']
+  onAssess: Props['onAssess']
+}) {
+  const phase = goal.phase
+
+  // Group items by phase
+  const itemsByPhase: Record<number, PortfolioItem[]> = {}
+  for (const item of goal.items) {
+    const p = item.phase || 1
+    if (!itemsByPhase[p]) itemsByPhase[p] = []
+    itemsByPhase[p].push(item)
+  }
+
+  const statusText =
+    phase === 0
+      ? 'Nog niet begonnen'
+      : phase === 4
+      ? 'Afgerond'
+      : `Fase ${phase + 1} actief`
+
+  const nextPhase = phase < 4 ? phase + 1 : null
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <GoalPhaseCircle phase={phase} goalName={goal.goal_name} description={goal.description} size="md" />
+          <div className="min-w-0">
+            <p className="font-medium truncate">{goal.goal_name}</p>
+            <p className="text-xs text-muted-foreground">{statusText}</p>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0 space-y-2">
+        {[1, 2, 3, 4].map((phaseNum) => {
+          const phaseCriteria = rubricCriteria.filter(
+            (rc) => rc.goal_number === goal.goal_number && rc.phase === phaseNum
+          )
+          return (
+            <PhaseSection
+              key={phaseNum}
+              phaseNum={phaseNum}
+              items={itemsByPhase[phaseNum] || []}
+              isPassed={phaseNum <= phase}
+              isNext={phaseNum === nextPhase}
+              criteria={phaseCriteria}
+              goalNumber={goal.goal_number}
+              goalName={goal.goal_name}
+              onFeedback={onFeedback}
+              onAssess={onAssess}
+            />
+          )
+        })}
+      </CardContent>
     </Card>
   )
 }
 
-export function PortfolioTab({ goals, onFeedback, onAssess }: Props) {
+export function PortfolioTab({ goals, rubricCriteria, onFeedback, onAssess }: Props) {
   const totalItems = goals.reduce((sum, g) => sum + g.items.length, 0)
   const itemsWithoutFeedback = goals
     .flatMap((g) => g.items)
@@ -223,7 +352,13 @@ export function PortfolioTab({ goals, onFeedback, onAssess }: Props) {
       )}
 
       {goals.map((goal) => (
-        <GoalSection key={goal.goal_number} goal={goal} onFeedback={onFeedback} onAssess={onAssess} />
+        <GoalSection
+          key={goal.goal_number}
+          goal={goal}
+          rubricCriteria={rubricCriteria}
+          onFeedback={onFeedback}
+          onAssess={onAssess}
+        />
       ))}
     </div>
   )

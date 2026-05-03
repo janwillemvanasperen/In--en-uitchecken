@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge'
 import { MessageSquare, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 
-const PHASE_LABELS = ['Onbekend', 'Oriëntatie', 'Ontwikkeling', 'Beheersing', 'Expert']
+const PHASE_LABELS = ['Nog niet begonnen', 'Fase 1', 'Fase 2', 'Fase 3', 'Afgerond']
 
 interface FeedbackRow {
   id: string

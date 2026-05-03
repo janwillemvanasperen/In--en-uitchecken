@@ -14,15 +14,17 @@ interface Props {
   onClose: () => void
   goalName: string
   goalNumber: number
+  phase: number
   onAdd: (data: {
     goal_number: number
+    phase: number
     title: string
     description?: string
     link_url?: string
   }) => Promise<{ error?: string }>
 }
 
-export function PortfolioUploadModal({ open, onClose, goalName, goalNumber, onAdd }: Props) {
+export function PortfolioUploadModal({ open, onClose, goalName, goalNumber, phase, onAdd }: Props) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [linkUrl, setLinkUrl] = useState('')
@@ -36,6 +38,7 @@ export function PortfolioUploadModal({ open, onClose, goalName, goalNumber, onAd
 
     const result = await onAdd({
       goal_number: goalNumber,
+      phase,
       title,
       description: description || undefined,
       link_url: linkUrl || undefined,
@@ -67,7 +70,7 @@ export function PortfolioUploadModal({ open, onClose, goalName, goalNumber, onAd
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Bewijs toevoegen</DialogTitle>
+          <DialogTitle>Bewijs toevoegen — Fase {phase}</DialogTitle>
           <p className="text-sm text-muted-foreground">{goalName}</p>
         </DialogHeader>
 
