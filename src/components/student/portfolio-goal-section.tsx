@@ -31,6 +31,24 @@ interface Slot {
   max_bookings: number
 }
 
+interface FeedbackRequest {
+  id: string
+  item_id: string
+  request_type: 'coach' | 'student' | 'external'
+  target_name: string | null
+  target_email: string | null
+  token: string | null
+  status: 'pending' | 'completed'
+  response_text: string | null
+  responded_by_name: string | null
+  responded_at: string | null
+}
+
+interface Classmate {
+  id: string
+  full_name: string
+}
+
 interface Props {
   goalNumber: number
   goalName: string
@@ -39,6 +57,8 @@ interface Props {
   phaseDescriptions: Record<number, string>
   itemsByPhase: Record<number, any[]>
   reviewRequests: Record<string, any>
+  feedbackRequestsByItem: Record<string, FeedbackRequest[]>
+  classmates: Classmate[]
   availableSlots: Slot[]
   allCriteria: RubricCriterion[]
   onAdd: (data: {
@@ -47,6 +67,7 @@ interface Props {
     title: string
     description?: string
     link_url?: string
+    file_url?: string
   }) => Promise<{ error?: string }>
   onDelete: (id: string) => Promise<{ error?: string }>
   onSubmitReview: (data: {
@@ -57,6 +78,15 @@ interface Props {
     notes?: string
   }) => Promise<{ error?: string }>
   onCancelReview: (requestId: string) => Promise<{ error?: string }>
+  onRequestFeedback: (
+    itemId: string,
+    data: {
+      request_type: 'coach' | 'student' | 'external'
+      target_user_id?: string
+      target_name?: string
+      target_email?: string
+    }
+  ) => Promise<{ error?: string; token?: string }>
 }
 
 function formatSlotShort(slot: any) {
@@ -76,10 +106,13 @@ function PhaseSection({
   criteria,
   goalNumber,
   goalName,
+  feedbackRequestsByItem,
+  classmates,
   onAdd,
   onDelete,
   onSubmitReview,
   onCancelReview,
+  onRequestFeedback,
 }: {
   phaseNum: number
   phaseDescription: string
@@ -91,10 +124,13 @@ function PhaseSection({
   criteria: RubricCriterion[]
   goalNumber: number
   goalName: string
+  feedbackRequestsByItem: Record<string, FeedbackRequest[]>
+  classmates: Classmate[]
   onAdd: Props['onAdd']
   onDelete: Props['onDelete']
   onSubmitReview: Props['onSubmitReview']
   onCancelReview: Props['onCancelReview']
+  onRequestFeedback: Props['onRequestFeedback']
 }) {
   const [open, setOpen] = useState(isActive)
   const [uploadOpen, setUploadOpen] = useState(false)
@@ -166,7 +202,14 @@ function PhaseSection({
           {items.length > 0 ? (
             <div className="space-y-2">
               {items.map((item) => (
-                <PortfolioItemCard key={item.id} item={item} onDelete={onDelete} />
+                <PortfolioItemCard
+                  key={item.id}
+                  item={item}
+                  feedbackRequests={feedbackRequestsByItem[item.id] || []}
+                  classmates={classmates}
+                  onDelete={onDelete}
+                  onRequestFeedback={onRequestFeedback}
+                />
               ))}
             </div>
           ) : (
@@ -243,12 +286,15 @@ export function PortfolioGoalSection({
   phaseDescriptions,
   itemsByPhase,
   reviewRequests,
+  feedbackRequestsByItem,
+  classmates,
   availableSlots,
   allCriteria,
   onAdd,
   onDelete,
   onSubmitReview,
   onCancelReview,
+  onRequestFeedback,
 }: Props) {
   const statusText =
     currentPhase === 0
@@ -289,10 +335,13 @@ export function PortfolioGoalSection({
               criteria={phaseCriteria}
               goalNumber={goalNumber}
               goalName={goalName}
+              feedbackRequestsByItem={feedbackRequestsByItem}
+              classmates={classmates}
               onAdd={onAdd}
               onDelete={onDelete}
               onSubmitReview={onSubmitReview}
               onCancelReview={onCancelReview}
+              onRequestFeedback={onRequestFeedback}
             />
           )
         })}

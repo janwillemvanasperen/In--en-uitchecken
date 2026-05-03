@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { MessageSquare, ChevronDown, ChevronUp, ExternalLink, ClipboardCheck, CheckCircle2, CalendarClock } from 'lucide-react'
+import { MessageSquare, ChevronDown, ChevronUp, ExternalLink, ClipboardCheck, CheckCircle2, CalendarClock, FileText, Bell } from 'lucide-react'
 import { GoalPhaseCircle } from '@/components/shared/goal-phase-circle'
 import { PortfolioFeedbackModal } from './portfolio-feedback-modal'
 import { PortfolioAssessModal } from './portfolio-assess-modal'
@@ -33,6 +33,7 @@ interface PortfolioItem {
   title: string
   description: string | null
   link_url: string | null
+  file_url: string | null
   phase: number
   created_at: string
   portfolio_feedback: FeedbackItem[]
@@ -57,6 +58,7 @@ interface Props {
   goals: GoalData[]
   rubricCriteria: RubricCriterion[]
   reviewRequestsByKey: Record<string, ReviewRequest>
+  itemsRequestingFeedback?: Set<string>
   onFeedback: (itemId: string, feedbackText: string) => Promise<{ error?: string }>
   onAssess: (
     goalNumber: number,
@@ -69,9 +71,11 @@ interface Props {
 
 function PortfolioItemRow({
   item,
+  requestingFeedback,
   onFeedback,
 }: {
   item: PortfolioItem
+  requestingFeedback: boolean
   onFeedback: (itemId: string, feedbackText: string) => Promise<{ error?: string }>
 }) {
   const [expanded, setExpanded] = useState(false)
@@ -95,15 +99,23 @@ function PortfolioItemRow({
                   {item.portfolio_feedback.length} feedback
                 </Badge>
               )}
+              {requestingFeedback && (
+                <Badge className="text-xs shrink-0 bg-orange-100 text-orange-700 border-orange-300 border">
+                  <Bell className="h-3 w-3 mr-1" />
+                  Feedback gevraagd
+                </Badge>
+              )}
             </div>
             <p className="text-xs text-muted-foreground">{date}</p>
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            {item.link_url && (
-              <a href={item.link_url} target="_blank" rel="noopener noreferrer">
+            {(item.link_url || item.file_url) && (
+              <a href={item.link_url || item.file_url!} target="_blank" rel="noopener noreferrer">
                 <Button variant="ghost" size="icon" className="h-7 w-7">
-                  <ExternalLink className="h-3.5 w-3.5" />
+                  {item.file_url && !item.link_url
+                    ? <FileText className="h-3.5 w-3.5" />
+                    : <ExternalLink className="h-3.5 w-3.5" />}
                 </Button>
               </a>
             )}
@@ -178,6 +190,7 @@ function PhaseSection({
   reviewRequest,
   goalNumber,
   goalName,
+  itemsRequestingFeedback,
   onFeedback,
   onAssess,
 }: {
@@ -189,6 +202,7 @@ function PhaseSection({
   reviewRequest: ReviewRequest | null
   goalNumber: number
   goalName: string
+  itemsRequestingFeedback: Set<string>
   onFeedback: Props['onFeedback']
   onAssess: Props['onAssess']
 }) {
@@ -254,7 +268,12 @@ function PhaseSection({
         <div className="px-4 pb-4 space-y-2">
           {items.length > 0 ? (
             items.map((item) => (
-              <PortfolioItemRow key={item.id} item={item} onFeedback={onFeedback} />
+              <PortfolioItemRow
+                key={item.id}
+                item={item}
+                requestingFeedback={itemsRequestingFeedback.has(item.id)}
+                onFeedback={onFeedback}
+              />
             ))
           ) : (
             <p className="text-sm text-muted-foreground">Nog geen bewijs voor fase {phaseNum}.</p>
@@ -282,12 +301,14 @@ function GoalSection({
   goal,
   rubricCriteria,
   reviewRequestsByKey,
+  itemsRequestingFeedback,
   onFeedback,
   onAssess,
 }: {
   goal: GoalData
   rubricCriteria: RubricCriterion[]
   reviewRequestsByKey: Record<string, ReviewRequest>
+  itemsRequestingFeedback: Set<string>
   onFeedback: Props['onFeedback']
   onAssess: Props['onAssess']
 }) {
@@ -337,6 +358,7 @@ function GoalSection({
               reviewRequest={reviewRequestsByKey[`${goal.goal_number}-${phaseNum}`] || null}
               goalNumber={goal.goal_number}
               goalName={goal.goal_name}
+              itemsRequestingFeedback={itemsRequestingFeedback}
               onFeedback={onFeedback}
               onAssess={onAssess}
             />
@@ -347,7 +369,7 @@ function GoalSection({
   )
 }
 
-export function PortfolioTab({ goals, rubricCriteria, reviewRequestsByKey, onFeedback, onAssess }: Props) {
+export function PortfolioTab({ goals, rubricCriteria, reviewRequestsByKey, itemsRequestingFeedback = new Set(), onFeedback, onAssess }: Props) {
   const totalItems = goals.reduce((sum, g) => sum + g.items.length, 0)
   const itemsWithoutFeedback = goals
     .flatMap((g) => g.items)
@@ -380,6 +402,7 @@ export function PortfolioTab({ goals, rubricCriteria, reviewRequestsByKey, onFee
           goal={goal}
           rubricCriteria={rubricCriteria}
           reviewRequestsByKey={reviewRequestsByKey}
+          itemsRequestingFeedback={itemsRequestingFeedback}
           onFeedback={onFeedback}
           onAssess={onAssess}
         />

@@ -67,6 +67,7 @@ export default async function CoachStudentDetailPage({
     { data: portfolioItems },
     { data: rubricCriteria },
     { data: reviewRequests },
+    { data: coachFeedbackRequests },
   ] = await Promise.all([
     adminClient.from('schedules').select('*').eq('user_id', studentId).order('valid_from', { ascending: false }),
     adminClient.from('check_ins').select('*, locations!check_ins_location_id_fkey(name)').eq('user_id', studentId).order('check_in_time', { ascending: false }).limit(50),
@@ -81,6 +82,7 @@ export default async function CoachStudentDetailPage({
     adminClient.from('portfolio_items').select('*, portfolio_feedback(id, feedback_text, created_at, coach_id)').eq('student_id', studentId).order('created_at', { ascending: false }),
     adminClient.from('rubric_criteria').select('id, goal_number, phase, criterion_text, description_insufficient, description_sufficient, description_good, sort_order').eq('active', true).order('goal_number').order('phase').order('sort_order'),
     adminClient.from('phase_review_requests').select('id, goal_number, phase, status, student_notes, slot_id, progress_meeting_slots(date, start_time, duration_minutes), phase_review_self_scores(criterion_id, score)').eq('student_id', studentId).eq('status', 'submitted'),
+    adminClient.from('portfolio_feedback_requests').select('item_id').eq('student_id', studentId).eq('request_type', 'coach').eq('status', 'pending'),
   ])
 
   // Today's schedule
@@ -163,6 +165,10 @@ export default async function CoachStudentDetailPage({
       slot: req.progress_meeting_slots || null,
     }
   }
+
+  const itemsRequestingCoachFeedback = new Set(
+    (coachFeedbackRequests || []).map((r: any) => r.item_id)
+  )
 
   const boundAddFeedback = addPortfolioFeedback
   const boundAssess = assessPortfolioPhase.bind(null, studentId)
@@ -515,6 +521,7 @@ export default async function CoachStudentDetailPage({
           goals={portfolioGoals}
           rubricCriteria={rubricCriteria || []}
           reviewRequestsByKey={reviewRequestsByKey}
+          itemsRequestingFeedback={itemsRequestingCoachFeedback}
           onFeedback={boundAddFeedback}
           onAssess={boundAssess}
         />
