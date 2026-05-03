@@ -42,10 +42,12 @@ export async function assessPortfolioPhase(
   const adminClient = createAdminClient()
 
   // Compute overall result from rubric scores
+  // Rule: any single "onvoldoende" criterion = onvoldoende overall (regardless of total %)
   const total = scores.reduce((sum, s) => sum + SCORE_VALUE[s.score], 0)
   const maxPossible = scores.length * 2
   const pct = maxPossible > 0 ? (total / maxPossible) * 100 : 0
-  const result: Score = pct >= 80 ? 'goed' : pct >= 50 ? 'voldoende' : 'onvoldoende'
+  const hasAnyOnvoldoende = scores.some((s) => s.score === 'onvoldoende')
+  const result: Score = hasAnyOnvoldoende ? 'onvoldoende' : pct >= 80 ? 'goed' : pct >= 50 ? 'voldoende' : 'onvoldoende'
 
   // Insert assessment record
   const { data: assessment, error: insertError } = await supabase

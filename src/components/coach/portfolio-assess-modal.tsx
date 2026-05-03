@@ -79,7 +79,8 @@ export function PortfolioAssessModal({
   const total = Object.values(scores).reduce((sum, s) => sum + SCORE_VALUE[s], 0)
   const maxPossible = criteria.length * 2
   const pct = maxPossible > 0 ? Math.round((total / maxPossible) * 100) : 0
-  const projectedResult: Score = pct >= 80 ? 'goed' : pct >= 50 ? 'voldoende' : 'onvoldoende'
+  const hasAnyOnvoldoende = Object.values(scores).some((s) => s === 'onvoldoende')
+  const projectedResult: Score = hasAnyOnvoldoende ? 'onvoldoende' : pct >= 80 ? 'goed' : pct >= 50 ? 'voldoende' : 'onvoldoende'
 
   // Build self-score lookup
   const selfScoreMap: Record<string, Score> = {}
@@ -229,22 +230,32 @@ export function PortfolioAssessModal({
             </div>
 
             {scoredCount > 0 && (
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 text-sm">
-                <span className="text-muted-foreground">
-                  Score: {total}/{maxPossible} ({pct}%)
-                </span>
-                {allScored && (
-                  <span
-                    className={`font-medium capitalize ${
-                      projectedResult === 'goed'
-                        ? 'text-green-600'
-                        : projectedResult === 'voldoende'
-                        ? 'text-yellow-600'
-                        : 'text-red-600'
-                    }`}
-                  >
-                    → {projectedResult}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 text-sm">
+                  <span className="text-muted-foreground">
+                    Score: {total}/{maxPossible} ({pct}%)
                   </span>
+                  {allScored && (
+                    <span
+                      className={`font-medium capitalize ${
+                        projectedResult === 'goed'
+                          ? 'text-green-600'
+                          : projectedResult === 'voldoende'
+                          ? 'text-yellow-600'
+                          : 'text-red-600'
+                      }`}
+                    >
+                      → {projectedResult}
+                    </span>
+                  )}
+                </div>
+                {hasAnyOnvoldoende && (
+                  <div className="flex items-start gap-2 text-xs p-2.5 rounded-md bg-red-50 text-red-700 border border-red-200">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                    <span>
+                      Eén of meer criteria zijn onvoldoende — de fase is daarmee onvoldoende, ook als het puntentotaal hoog is.
+                    </span>
+                  </div>
                 )}
               </div>
             )}
