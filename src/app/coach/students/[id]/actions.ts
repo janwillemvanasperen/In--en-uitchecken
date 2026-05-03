@@ -34,7 +34,8 @@ export async function assessPortfolioPhase(
   goalNumber: number,
   phaseAssessed: number,
   scores: { criterion_id: string; score: Score }[],
-  notes?: string
+  notes?: string,
+  reviewRequestId?: string
 ): Promise<{ error?: string }> {
   const coach = await requireCoach()
   const supabase = await createClient()
@@ -95,6 +96,14 @@ export async function assessPortfolioPhase(
       .eq('student_id', studentId)
 
     if (updateError) return { error: updateError.message }
+  }
+
+  // Mark review request as assessed if provided
+  if (reviewRequestId) {
+    await adminClient
+      .from('phase_review_requests')
+      .update({ status: 'assessed', updated_at: new Date().toISOString() })
+      .eq('id', reviewRequestId)
   }
 
   revalidatePath('/coach/students', 'layout')

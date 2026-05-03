@@ -2,7 +2,7 @@
 import { requireStudent } from '@/lib/auth'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { PortfolioGoalSection } from '@/components/student/portfolio-goal-section'
-import { addPortfolioItem, deletePortfolioItem } from './actions'
+import { addPortfolioItem, deletePortfolioItem, submitPhaseReview, cancelPhaseReview } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,6 +16,9 @@ export default async function StudentPortfolioPage() {
     { data: devGoals },
     { data: items },
     { data: rubricCriteria },
+    { data: reviewRequestsRaw },
+    { data: allSlots },
+    { data: slotBookings },
   ] = await Promise.all([
     adminClient
       .from('development_goal_names')
@@ -34,11 +37,27 @@ export default async function StudentPortfolioPage() {
       .order('created_at', { ascending: false }),
     adminClient
       .from('rubric_criteria')
-      .select('goal_number, phase, phase_description')
+      .select('id, goal_number, phase, phase_description, criterion_text, description_insufficient, description_sufficient, description_good, sort_order')
       .eq('active', true)
       .order('goal_number')
       .order('phase')
       .order('sort_order'),
+    supabase
+      .from('phase_review_requests')
+      .select('id, goal_number, phase, status, student_notes, slot_id, progress_meeting_slots(date, start_time, duration_minutes)')
+      .eq('student_id', user.id)
+      .eq('status', 'submitted'),
+    supabase
+      .from('progress_meeting_slots')
+      .select('id, date, start_time, duration_minutes, max_bookings')
+      .eq('active', true)
+      .gte('date', new Date().toISOString().split('T')[0])
+      .order('date')
+      .order('start_time'),
+    supabase
+      .from('phase_review_requests')
+      .select('slot_id')
+      .neq('status', 'cancelled'),
   ])
 
   const goalNames = Array.from({ length: 6 }, (_, i) => {
@@ -55,14 +74,32 @@ export default async function StudentPortfolioPage() {
     devGoals?.goal_6_phase ?? 0,
   ]
 
-  // Build phase descriptions: { [goal_number]: { [phase]: description } }
+  // Phase descriptions and full criteria grouped by goal_number
   const phaseDescriptions: Record<number, Record<number, string>> = {}
+  const criteriaByGoal: Record<number, any[]> = {}
   for (const rc of rubricCriteria || []) {
     if (!phaseDescriptions[rc.goal_number]) phaseDescriptions[rc.goal_number] = {}
     if (!phaseDescriptions[rc.goal_number][rc.phase] && rc.phase_description) {
       phaseDescriptions[rc.goal_number][rc.phase] = rc.phase_description
     }
+    if (!criteriaByGoal[rc.goal_number]) criteriaByGoal[rc.goal_number] = []
+    criteriaByGoal[rc.goal_number].push(rc)
   }
+
+  // Review requests keyed by "goal_number-phase"
+  const reviewRequests: Record<string, any> = {}
+  for (const req of reviewRequestsRaw || []) {
+    reviewRequests[`${req.goal_number}-${req.phase}`] = req
+  }
+
+  // Available slots (exclude fully booked)
+  const bookingCounts: Record<string, number> = {}
+  for (const b of slotBookings || []) {
+    if (b.slot_id) bookingCounts[b.slot_id] = (bookingCounts[b.slot_id] || 0) + 1
+  }
+  const availableSlots = (allSlots || []).filter(
+    (s) => (bookingCounts[s.id] || 0) < s.max_bookings
+  )
 
   // Group items by goal_number → phase
   const itemsByGoalPhase: Record<number, Record<number, any[]>> = {}
@@ -92,8 +129,13 @@ export default async function StudentPortfolioPage() {
           currentPhase={phases[i]}
           phaseDescriptions={phaseDescriptions[goal.goal_number] || {}}
           itemsByPhase={itemsByGoalPhase[goal.goal_number] || {}}
+          reviewRequests={reviewRequests}
+          availableSlots={availableSlots}
+          allCriteria={criteriaByGoal[goal.goal_number] || []}
           onAdd={addPortfolioItem}
           onDelete={deletePortfolioItem}
+          onSubmitReview={submitPhaseReview}
+          onCancelReview={cancelPhaseReview}
         />
       ))}
     </div>

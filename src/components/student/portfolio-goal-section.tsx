@@ -3,10 +3,33 @@
 import { useState } from 'react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, ChevronDown, ChevronUp, CheckCircle2 } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Plus, ChevronDown, ChevronUp, CheckCircle2, ClipboardList, X, CalendarClock } from 'lucide-react'
 import { GoalPhaseCircle } from '@/components/shared/goal-phase-circle'
 import { PortfolioItemCard } from './portfolio-item-card'
 import { PortfolioUploadModal } from './portfolio-upload-modal'
+import { PhaseReviewModal } from './phase-review-modal'
+
+type Score = 'onvoldoende' | 'voldoende' | 'goed'
+
+interface RubricCriterion {
+  id: string
+  goal_number: number
+  phase: number
+  criterion_text: string
+  description_insufficient: string
+  description_sufficient: string
+  description_good: string
+  sort_order: number
+}
+
+interface Slot {
+  id: string
+  date: string
+  start_time: string
+  duration_minutes: number
+  max_bookings: number
+}
 
 interface Props {
   goalNumber: number
@@ -15,6 +38,9 @@ interface Props {
   currentPhase: number
   phaseDescriptions: Record<number, string>
   itemsByPhase: Record<number, any[]>
+  reviewRequests: Record<string, any>
+  availableSlots: Slot[]
+  allCriteria: RubricCriterion[]
   onAdd: (data: {
     goal_number: number
     phase: number
@@ -23,6 +49,20 @@ interface Props {
     link_url?: string
   }) => Promise<{ error?: string }>
   onDelete: (id: string) => Promise<{ error?: string }>
+  onSubmitReview: (data: {
+    goal_number: number
+    phase: number
+    slot_id: string
+    self_scores: { criterion_id: string; score: Score }[]
+    notes?: string
+  }) => Promise<{ error?: string }>
+  onCancelReview: (requestId: string) => Promise<{ error?: string }>
+}
+
+function formatSlotShort(slot: any) {
+  const d = new Date(`${slot.date}T${slot.start_time}`)
+  const end = new Date(d.getTime() + (slot.duration_minutes || 30) * 60000)
+  return `${d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })} · ${d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}–${end.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}`
 }
 
 function PhaseSection({
@@ -31,29 +71,52 @@ function PhaseSection({
   items,
   isActive,
   isPassed,
+  reviewRequest,
+  availableSlots,
+  criteria,
   goalNumber,
   goalName,
   onAdd,
   onDelete,
+  onSubmitReview,
+  onCancelReview,
 }: {
   phaseNum: number
   phaseDescription: string
   items: any[]
   isActive: boolean
   isPassed: boolean
+  reviewRequest: any | null
+  availableSlots: Slot[]
+  criteria: RubricCriterion[]
   goalNumber: number
   goalName: string
   onAdd: Props['onAdd']
   onDelete: Props['onDelete']
+  onSubmitReview: Props['onSubmitReview']
+  onCancelReview: Props['onCancelReview']
 }) {
   const [open, setOpen] = useState(isActive)
   const [uploadOpen, setUploadOpen] = useState(false)
+  const [reviewOpen, setReviewOpen] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+
+  const hasReview = !!reviewRequest
+
+  async function handleCancel() {
+    if (!confirm('Aanvraag annuleren?')) return
+    setCancelling(true)
+    await onCancelReview(reviewRequest.id)
+    setCancelling(false)
+  }
 
   const borderColor = isPassed
     ? 'border-green-200 bg-green-50/40'
     : isActive
     ? 'border-primary/40 bg-primary/5'
     : 'border-border'
+
+  const slot = reviewRequest?.progress_meeting_slots
 
   return (
     <div className={`rounded-lg border ${borderColor}`}>
@@ -78,8 +141,14 @@ function PhaseSection({
               </span>
             )}
           </div>
-          {items.length > 0 && (
+          {items.length > 0 && !hasReview && (
             <span className="text-xs text-muted-foreground shrink-0">({items.length})</span>
+          )}
+          {hasReview && (
+            <Badge className="text-[10px] bg-[#ffd100] text-black shrink-0">
+              <CalendarClock className="h-3 w-3 mr-1" />
+              {slot ? formatSlotShort(slot) : 'Beoordeling aangevraagd'}
+            </Badge>
           )}
         </div>
         {open ? (
@@ -103,15 +172,43 @@ function PhaseSection({
           ) : (
             <p className="text-sm text-muted-foreground">Nog geen bewijs voor fase {phaseNum}.</p>
           )}
-          <Button
-            size="sm"
-            variant={isActive ? 'default' : 'outline'}
-            onClick={() => setUploadOpen(true)}
-            className="gap-1"
-          >
-            <Plus className="h-4 w-4" />
-            Bewijs toevoegen
-          </Button>
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant={isActive ? 'default' : 'outline'}
+              onClick={() => setUploadOpen(true)}
+              className="gap-1"
+            >
+              <Plus className="h-4 w-4" />
+              Bewijs toevoegen
+            </Button>
+
+            {!isPassed && items.length > 0 && !hasReview && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setReviewOpen(true)}
+                className="gap-1 border-[#ffd100] text-foreground hover:bg-[#ffd100]/10"
+              >
+                <ClipboardList className="h-4 w-4" />
+                Gereed voor beoordeling
+              </Button>
+            )}
+
+            {hasReview && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleCancel}
+                disabled={cancelling}
+                className="gap-1 text-muted-foreground hover:text-destructive"
+              >
+                <X className="h-4 w-4" />
+                Aanvraag annuleren
+              </Button>
+            )}
+          </div>
         </div>
       )}
 
@@ -122,6 +219,17 @@ function PhaseSection({
         goalNumber={goalNumber}
         phase={phaseNum}
         onAdd={onAdd}
+      />
+
+      <PhaseReviewModal
+        open={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+        goalName={goalName}
+        goalNumber={goalNumber}
+        phase={phaseNum}
+        criteria={criteria}
+        availableSlots={availableSlots}
+        onSubmit={onSubmitReview}
       />
     </div>
   )
@@ -134,8 +242,13 @@ export function PortfolioGoalSection({
   currentPhase,
   phaseDescriptions,
   itemsByPhase,
+  reviewRequests,
+  availableSlots,
+  allCriteria,
   onAdd,
   onDelete,
+  onSubmitReview,
+  onCancelReview,
 }: Props) {
   const statusText =
     currentPhase === 0
@@ -161,20 +274,28 @@ export function PortfolioGoalSection({
         </div>
       </CardHeader>
       <CardContent className="pt-0 space-y-2">
-        {[1, 2, 3, 4].map((phaseNum) => (
-          <PhaseSection
-            key={phaseNum}
-            phaseNum={phaseNum}
-            phaseDescription={phaseDescriptions[phaseNum] || ''}
-            items={itemsByPhase[phaseNum] || []}
-            isActive={currentPhase < 4 && phaseNum === currentPhase + 1}
-            isPassed={phaseNum <= currentPhase}
-            goalNumber={goalNumber}
-            goalName={goalName}
-            onAdd={onAdd}
-            onDelete={onDelete}
-          />
-        ))}
+        {[1, 2, 3, 4].map((phaseNum) => {
+          const phaseCriteria = allCriteria.filter((c) => c.phase === phaseNum)
+          return (
+            <PhaseSection
+              key={phaseNum}
+              phaseNum={phaseNum}
+              phaseDescription={phaseDescriptions[phaseNum] || ''}
+              items={itemsByPhase[phaseNum] || []}
+              isActive={currentPhase < 4 && phaseNum === currentPhase + 1}
+              isPassed={phaseNum <= currentPhase}
+              reviewRequest={reviewRequests[`${goalNumber}-${phaseNum}`] || null}
+              availableSlots={availableSlots}
+              criteria={phaseCriteria}
+              goalNumber={goalNumber}
+              goalName={goalName}
+              onAdd={onAdd}
+              onDelete={onDelete}
+              onSubmitReview={onSubmitReview}
+              onCancelReview={onCancelReview}
+            />
+          )
+        })}
       </CardContent>
     </Card>
   )

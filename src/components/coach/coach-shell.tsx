@@ -10,12 +10,13 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   Menu, LayoutDashboard, Users, Briefcase, FileText,
-  GitCompare, Settings, Bell, CalendarDays, PartyPopper
+  GitCompare, Settings, Bell, CalendarDays, PartyPopper, MessageSquareMore
 } from 'lucide-react'
 
 const navItems = [
   { href: '/coach/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/coach/students', label: 'Studenten', icon: Users },
+  { href: '/coach/slots', label: 'Voortgangsgesprekken', icon: MessageSquareMore },
   { href: '/coach/work', label: 'Ingediend Werk', icon: Briefcase, comingSoon: true },
   { href: '/coach/notes', label: 'Notities', icon: FileText },
   { href: '/coach/calendar', label: 'Kalender', icon: CalendarDays },

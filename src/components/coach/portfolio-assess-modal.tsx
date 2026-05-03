@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Loader2, AlertTriangle, TrendingUp } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Loader2, AlertTriangle, TrendingUp, CalendarClock, User } from 'lucide-react'
 
 type Score = 'onvoldoende' | 'voldoende' | 'goed'
 
@@ -18,6 +19,12 @@ const SCORE_STYLES: Record<Score, string> = {
   goed: 'border-green-300 bg-green-50 text-green-700 ring-green-400',
 }
 
+const SCORE_BADGE_CLASS: Record<Score, string> = {
+  onvoldoende: 'bg-red-100 text-red-700 border-red-200',
+  voldoende: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  goed: 'bg-green-100 text-green-700 border-green-200',
+}
+
 interface RubricCriterion {
   id: string
   criterion_text: string
@@ -27,6 +34,13 @@ interface RubricCriterion {
   sort_order: number
 }
 
+interface ReviewRequest {
+  id: string
+  student_notes: string | null
+  self_scores: { criterion_id: string; score: Score }[]
+  slot: { date: string; start_time: string; duration_minutes: number } | null
+}
+
 interface Props {
   open: boolean
   onClose: () => void
@@ -34,16 +48,25 @@ interface Props {
   goalNumber: number
   phaseToAssess: number
   criteria: RubricCriterion[]
+  reviewRequest?: ReviewRequest | null
   onSubmit: (
     goalNumber: number,
     phaseAssessed: number,
     scores: { criterion_id: string; score: Score }[],
-    notes?: string
+    notes?: string,
+    reviewRequestId?: string
   ) => Promise<{ error?: string }>
 }
 
+function formatSlot(slot: ReviewRequest['slot']) {
+  if (!slot) return null
+  const d = new Date(`${slot.date}T${slot.start_time}`)
+  const end = new Date(d.getTime() + (slot.duration_minutes || 30) * 60000)
+  return `${d.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })} · ${d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}–${end.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}`
+}
+
 export function PortfolioAssessModal({
-  open, onClose, goalName, goalNumber, phaseToAssess, criteria, onSubmit,
+  open, onClose, goalName, goalNumber, phaseToAssess, criteria, reviewRequest, onSubmit,
 }: Props) {
   const [scores, setScores] = useState<Record<string, Score>>({})
   const [notes, setNotes] = useState('')
@@ -57,6 +80,12 @@ export function PortfolioAssessModal({
   const maxPossible = criteria.length * 2
   const pct = maxPossible > 0 ? Math.round((total / maxPossible) * 100) : 0
   const projectedResult: Score = pct >= 80 ? 'goed' : pct >= 50 ? 'voldoende' : 'onvoldoende'
+
+  // Build self-score lookup
+  const selfScoreMap: Record<string, Score> = {}
+  for (const ss of reviewRequest?.self_scores || []) {
+    selfScoreMap[ss.criterion_id] = ss.score
+  }
 
   function setScore(criterionId: string, score: Score) {
     setScores((prev) => ({ ...prev, [criterionId]: score }))
@@ -73,7 +102,13 @@ export function PortfolioAssessModal({
       score: scores[c.id],
     }))
 
-    const res = await onSubmit(goalNumber, phaseToAssess, scoresList, notes || undefined)
+    const res = await onSubmit(
+      goalNumber,
+      phaseToAssess,
+      scoresList,
+      notes || undefined,
+      reviewRequest?.id
+    )
     if (res.error) {
       setError(res.error)
       setLoading(false)
@@ -104,50 +139,93 @@ export function PortfolioAssessModal({
           <p className="text-sm text-muted-foreground truncate">{goalName}</p>
         </DialogHeader>
 
+        {/* Review request info */}
+        {reviewRequest && (
+          <div className="space-y-2 p-3 rounded-lg bg-[#ffd100]/10 border border-[#ffd100]/30">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <CalendarClock className="h-4 w-4 text-[#ffd100]" />
+              <span>Voortgangsgesprek aangevraagd</span>
+            </div>
+            {reviewRequest.slot && (
+              <p className="text-sm text-muted-foreground">{formatSlot(reviewRequest.slot)}</p>
+            )}
+            {reviewRequest.student_notes && (
+              <div className="flex items-start gap-2 text-sm">
+                <User className="h-3.5 w-3.5 mt-0.5 text-muted-foreground shrink-0" />
+                <p className="text-muted-foreground italic">&ldquo;{reviewRequest.student_notes}&rdquo;</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {criteria.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4">
             Geen beoordelingscriteria gevonden voor deze fase.
           </p>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Show self-assessment column headers if available */}
+            {reviewRequest?.self_scores && reviewRequest.self_scores.length > 0 && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <User className="h-3.5 w-3.5" />
+                <span>Zelfbeoordeling student is zichtbaar per criterium</span>
+              </div>
+            )}
+
             <div className="space-y-3">
-              {criteria.map((c, idx) => (
-                <div key={c.id} className="border rounded-lg p-3 space-y-2">
-                  <p className="text-sm font-medium">
-                    <span className="text-muted-foreground mr-2">{idx + 1}.</span>
-                    {c.criterion_text}
-                  </p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(['onvoldoende', 'voldoende', 'goed'] as Score[]).map((s) => {
-                      const isSelected = scores[c.id] === s
-                      const desc =
-                        s === 'onvoldoende'
-                          ? c.description_insufficient
-                          : s === 'voldoende'
-                          ? c.description_sufficient
-                          : c.description_good
-                      return (
-                        <button
-                          key={s}
-                          type="button"
-                          onClick={() => setScore(c.id, s)}
-                          disabled={loading}
-                          className={`text-left p-2 rounded-md border-2 transition-all text-xs ${
-                            isSelected
-                              ? SCORE_STYLES[s] + ' ring-2 ring-offset-1'
-                              : 'border-border bg-card hover:bg-muted/50'
-                          }`}
-                        >
-                          <p className="font-semibold capitalize">{s}</p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug line-clamp-3">
-                            {desc}
-                          </p>
-                        </button>
-                      )
-                    })}
+              {criteria.map((c, idx) => {
+                const selfScore = selfScoreMap[c.id]
+                return (
+                  <div key={c.id} className="border rounded-lg p-3 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-medium flex-1">
+                        <span className="text-muted-foreground mr-2">{idx + 1}.</span>
+                        {c.criterion_text}
+                      </p>
+                      {selfScore && (
+                        <div className="flex items-center gap-1 shrink-0">
+                          <User className="h-3 w-3 text-muted-foreground" />
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] px-1.5 py-0 h-5 capitalize ${SCORE_BADGE_CLASS[selfScore]}`}
+                          >
+                            {selfScore}
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(['onvoldoende', 'voldoende', 'goed'] as Score[]).map((s) => {
+                        const isSelected = scores[c.id] === s
+                        const desc =
+                          s === 'onvoldoende'
+                            ? c.description_insufficient
+                            : s === 'voldoende'
+                            ? c.description_sufficient
+                            : c.description_good
+                        return (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => setScore(c.id, s)}
+                            disabled={loading}
+                            className={`text-left p-2 rounded-md border-2 transition-all text-xs ${
+                              isSelected
+                                ? SCORE_STYLES[s] + ' ring-2 ring-offset-1'
+                                : 'border-border bg-card hover:bg-muted/50'
+                            }`}
+                          >
+                            <p className="font-semibold capitalize">{s}</p>
+                            <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug line-clamp-3">
+                              {desc}
+                            </p>
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
 
             {scoredCount > 0 && (

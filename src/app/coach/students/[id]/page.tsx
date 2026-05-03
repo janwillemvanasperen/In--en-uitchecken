@@ -66,6 +66,7 @@ export default async function CoachStudentDetailPage({
     { data: devGoals },
     { data: portfolioItems },
     { data: rubricCriteria },
+    { data: reviewRequests },
   ] = await Promise.all([
     adminClient.from('schedules').select('*').eq('user_id', studentId).order('valid_from', { ascending: false }),
     adminClient.from('check_ins').select('*, locations!check_ins_location_id_fkey(name)').eq('user_id', studentId).order('check_in_time', { ascending: false }).limit(50),
@@ -79,6 +80,7 @@ export default async function CoachStudentDetailPage({
     adminClient.from('student_development_goals').select('goal_1_phase, goal_2_phase, goal_3_phase, goal_4_phase, goal_5_phase, goal_6_phase').eq('student_id', studentId).single(),
     adminClient.from('portfolio_items').select('*, portfolio_feedback(id, feedback_text, created_at, coach_id)').eq('student_id', studentId).order('created_at', { ascending: false }),
     adminClient.from('rubric_criteria').select('id, goal_number, phase, criterion_text, description_insufficient, description_sufficient, description_good, sort_order').eq('active', true).order('goal_number').order('phase').order('sort_order'),
+    adminClient.from('phase_review_requests').select('id, goal_number, phase, status, student_notes, slot_id, progress_meeting_slots(date, start_time, duration_minutes), phase_review_self_scores(criterion_id, score)').eq('student_id', studentId).eq('status', 'submitted'),
   ])
 
   // Today's schedule
@@ -150,6 +152,17 @@ export default async function CoachStudentDetailPage({
       items: itemsByGoal[i + 1] || [],
     }
   })
+
+  // Review requests keyed by "goal_number-phase" for quick lookup
+  const reviewRequestsByKey: Record<string, any> = {}
+  for (const req of reviewRequests || []) {
+    reviewRequestsByKey[`${req.goal_number}-${req.phase}`] = {
+      id: req.id,
+      student_notes: req.student_notes,
+      self_scores: req.phase_review_self_scores || [],
+      slot: req.progress_meeting_slots || null,
+    }
+  }
 
   const boundAddFeedback = addPortfolioFeedback
   const boundAssess = assessPortfolioPhase.bind(null, studentId)
@@ -501,6 +514,7 @@ export default async function CoachStudentDetailPage({
         <PortfolioTab
           goals={portfolioGoals}
           rubricCriteria={rubricCriteria || []}
+          reviewRequestsByKey={reviewRequestsByKey}
           onFeedback={boundAddFeedback}
           onAssess={boundAssess}
         />

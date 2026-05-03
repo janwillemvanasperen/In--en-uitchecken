@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { MessageSquare, ChevronDown, ChevronUp, ExternalLink, ClipboardCheck, CheckCircle2 } from 'lucide-react'
+import { MessageSquare, ChevronDown, ChevronUp, ExternalLink, ClipboardCheck, CheckCircle2, CalendarClock } from 'lucide-react'
 import { GoalPhaseCircle } from '@/components/shared/goal-phase-circle'
 import { PortfolioFeedbackModal } from './portfolio-feedback-modal'
 import { PortfolioAssessModal } from './portfolio-assess-modal'
@@ -46,15 +46,24 @@ interface GoalData {
   items: PortfolioItem[]
 }
 
+interface ReviewRequest {
+  id: string
+  student_notes: string | null
+  self_scores: { criterion_id: string; score: Score }[]
+  slot: { date: string; start_time: string; duration_minutes: number } | null
+}
+
 interface Props {
   goals: GoalData[]
   rubricCriteria: RubricCriterion[]
+  reviewRequestsByKey: Record<string, ReviewRequest>
   onFeedback: (itemId: string, feedbackText: string) => Promise<{ error?: string }>
   onAssess: (
     goalNumber: number,
     phaseAssessed: number,
     scores: { criterion_id: string; score: Score }[],
-    notes?: string
+    notes?: string,
+    reviewRequestId?: string
   ) => Promise<{ error?: string }>
 }
 
@@ -166,6 +175,7 @@ function PhaseSection({
   isPassed,
   isNext,
   criteria,
+  reviewRequest,
   goalNumber,
   goalName,
   onFeedback,
@@ -176,12 +186,13 @@ function PhaseSection({
   isPassed: boolean
   isNext: boolean
   criteria: RubricCriterion[]
+  reviewRequest: ReviewRequest | null
   goalNumber: number
   goalName: string
   onFeedback: Props['onFeedback']
   onAssess: Props['onAssess']
 }) {
-  const [open, setOpen] = useState(isNext || (isPassed && items.length > 0))
+  const [open, setOpen] = useState(isNext || !!reviewRequest || (isPassed && items.length > 0))
   const [assessOpen, setAssessOpen] = useState(false)
 
   const canAssess = isNext && items.length > 0 && criteria.length > 0
@@ -207,7 +218,13 @@ function PhaseSection({
             Fase {phaseNum}{isPassed ? ' — beoordeeld' : ''}
           </span>
           {items.length > 0 && (
-            <span className="text-xs text-muted-foreground shrink-0">({items.length} bewijsstukken)</span>
+            <span className="text-xs text-muted-foreground shrink-0">({items.length})</span>
+          )}
+          {reviewRequest && (
+            <Badge className="text-[10px] bg-[#ffd100] text-black shrink-0">
+              <CalendarClock className="h-3 w-3 mr-1" />
+              Gesprek aangevraagd
+            </Badge>
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -252,7 +269,10 @@ function PhaseSection({
         goalNumber={goalNumber}
         phaseToAssess={phaseNum}
         criteria={criteria}
-        onSubmit={(goalNum, phase, scores, notes) => onAssess(goalNum, phase, scores, notes)}
+        reviewRequest={reviewRequest}
+        onSubmit={(goalNum, phase, scores, notes, reviewRequestId) =>
+          onAssess(goalNum, phase, scores, notes, reviewRequestId)
+        }
       />
     </div>
   )
@@ -261,11 +281,13 @@ function PhaseSection({
 function GoalSection({
   goal,
   rubricCriteria,
+  reviewRequestsByKey,
   onFeedback,
   onAssess,
 }: {
   goal: GoalData
   rubricCriteria: RubricCriterion[]
+  reviewRequestsByKey: Record<string, ReviewRequest>
   onFeedback: Props['onFeedback']
   onAssess: Props['onAssess']
 }) {
@@ -312,6 +334,7 @@ function GoalSection({
               isPassed={phaseNum <= phase}
               isNext={phaseNum === nextPhase}
               criteria={phaseCriteria}
+              reviewRequest={reviewRequestsByKey[`${goal.goal_number}-${phaseNum}`] || null}
               goalNumber={goal.goal_number}
               goalName={goal.goal_name}
               onFeedback={onFeedback}
@@ -324,7 +347,7 @@ function GoalSection({
   )
 }
 
-export function PortfolioTab({ goals, rubricCriteria, onFeedback, onAssess }: Props) {
+export function PortfolioTab({ goals, rubricCriteria, reviewRequestsByKey, onFeedback, onAssess }: Props) {
   const totalItems = goals.reduce((sum, g) => sum + g.items.length, 0)
   const itemsWithoutFeedback = goals
     .flatMap((g) => g.items)
@@ -356,6 +379,7 @@ export function PortfolioTab({ goals, rubricCriteria, onFeedback, onAssess }: Pr
           key={goal.goal_number}
           goal={goal}
           rubricCriteria={rubricCriteria}
+          reviewRequestsByKey={reviewRequestsByKey}
           onFeedback={onFeedback}
           onAssess={onAssess}
         />
